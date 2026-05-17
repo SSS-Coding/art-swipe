@@ -1,0 +1,15 @@
+package com.artswipe.domain.model
+
+data class StyleProfile(
+    val topStyle: String,
+    val personalityLabel: String,
+    val personalityDescription: String,
+    val styleBreakdown: List<StylePercentage>,
+    val showPersonalityCard: Boolean
+)
+
+data class StylePercentage(
+    val style: String,
+    val percentage: Float,
+    val likeCount: Int
+)

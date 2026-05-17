@@ -1,0 +1,296 @@
+package com.artswipe.ui.screens.profile
+
+import android.content.Intent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.Recommend
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.artswipe.domain.model.StylePercentage
+import com.artswipe.domain.model.StyleProfile
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileScreen(
+    onBack: () -> Unit,
+    onNavigateToAuth: () -> Unit,
+    onNavigateToRecommendations: () -> Unit,
+    onNavigateToCompatibility: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel()
+) {
+    val user by viewModel.currentUser.collectAsState()
+    val styleProfile by viewModel.styleProfile.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(user) {
+        if (user == null) {
+            onNavigateToAuth()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("Your Taste Profile") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { viewModel.signOut() }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Sign Out")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+            contentPadding = PaddingValues(bottom = 32.dp)
+        ) {
+            item {
+                styleProfile?.let { profile ->
+                    PersonalityCard(profile)
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onNavigateToRecommendations,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        Icon(Icons.Default.Recommend, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Recommendations")
+                    }
+                    Button(
+                        onClick = onNavigateToCompatibility,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        Icon(Icons.Default.CompareArrows, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Compare")
+                    }
+                }
+            }
+
+            item {
+                styleProfile?.let { profile ->
+                    StyleBreakdownSection(profile.styleBreakdown)
+                }
+            }
+
+            item {
+                Text(
+                    text = "Top Styles",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            styleProfile?.let { profile ->
+                items(profile.styleBreakdown) { styleItem ->
+                    StyleRow(styleItem)
+                }
+            }
+            
+            if (styleProfile == null || styleProfile?.styleBreakdown?.isEmpty() == true) {
+                item {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("Keep swiping to build your profile!", style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+
+            item {
+                user?.let { u ->
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .padding(16.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text(text = "Your Share Code", style = MaterialTheme.typography.labelMedium)
+                                Text(text = u.shareCode, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            }
+                            IconButton(onClick = {
+                                val sendIntent: Intent = Intent().apply {
+                                    action = Intent.ACTION_SEND
+                                    putExtra(Intent.EXTRA_TEXT, "Check out my art taste on ArtSwipe! My code is: ${u.shareCode}. Download the app to compare!")
+                                    type = "text/plain"
+                                }
+                                val shareIntent = Intent.createChooser(sendIntent, null)
+                                context.startActivity(shareIntent)
+                            }) {
+                                Icon(Icons.Default.Share, contentDescription = "Share Code")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun PersonalityCard(profile: StyleProfile) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        shape = RoundedCornerShape(24.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            if (profile.showPersonalityCard) {
+                Text(
+                    text = profile.personalityLabel,
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Top Style: ${profile.topStyle}",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = profile.personalityDescription,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    lineHeight = 22.sp
+                )
+            } else {
+                Text(
+                    text = "Analyzing Your Taste...",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Swipe on more art to unlock your personality card.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun StyleBreakdownSection(breakdown: List<StylePercentage>) {
+    Column {
+        Text(
+            text = "Style Breakdown",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(40.dp)
+                .clip(RoundedCornerShape(20.dp))
+        ) {
+            val colors = listOf(
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.secondary,
+                MaterialTheme.colorScheme.tertiary,
+                MaterialTheme.colorScheme.error,
+                MaterialTheme.colorScheme.outline
+            )
+            
+            breakdown.forEachIndexed { index, item ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .weight(item.percentage.coerceAtLeast(1f))
+                        .background(colors[index % colors.size])
+                )
+            }
+        }
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            val colors = listOf(
+                MaterialTheme.colorScheme.primary,
+                MaterialTheme.colorScheme.secondary,
+                MaterialTheme.colorScheme.tertiary,
+                MaterialTheme.colorScheme.error,
+                MaterialTheme.colorScheme.outline
+            )
+            breakdown.forEachIndexed { index, item ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(colors[index % colors.size])
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "${item.style} ${item.percentage.toInt()}%", fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StyleRow(item: StylePercentage) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = item.style, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+        Text(
+            text = "${item.likeCount} Likes",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
