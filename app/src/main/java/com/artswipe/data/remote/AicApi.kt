@@ -8,7 +8,7 @@ interface AicApi {
     suspend fun getArtworks(
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 20,
-        @Query("fields") fields: String = "id,title,artist_display,date_display,image_id,medium_display,style_title,department_title"
+        @Query("fields") fields: String = "id,title,artist_display,date_display,image_id,medium_display,style_title,department_title,description"
     ): AicResponse
 }
 
@@ -25,8 +25,11 @@ data class AicArtwork(
     val image_id: String?,
     val medium_display: String?,
     val style_title: String?,
-    val department_title: String?
-)
+    val department_title: String?,
+    val description: String?
+) {
+    val websiteUrl: String get() = "https://www.artic.edu/artworks/$id"
+}
 
 data class AicConfig(
     val iiif_url: String

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "97227489738",
+    "project_id": "art-tinder",
+    "storage_bucket": "art-tinder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:97227489738:android:e47b378b8364d4d1518f33",
+        "android_client_info": {
+          "package_name": "com.artswipe"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAUMuKRRaH_RQa0q_uZkdvIyABfKqYB6lQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

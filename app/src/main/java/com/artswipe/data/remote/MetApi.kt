@@ -8,13 +8,17 @@ interface MetApi {
     @GET("search")
     suspend fun search(
         @Query("q") query: String,
-        @Query("hasImages") hasImages: Boolean = true
+        @Query("hasImages") hasImages: Boolean = true,
+        @Query("departmentId") departmentId: Int? = null
     ): MetSearchResponse
 
     @GET("objects/{objectId}")
     suspend fun getObject(
         @Path("objectId") objectId: Int
     ): MetObjectResponse
+
+    @GET("departments")
+    suspend fun getDepartments(): MetDepartmentsResponse
 }
 
 data class MetSearchResponse(
@@ -30,5 +34,15 @@ data class MetObjectResponse(
     val primaryImage: String?,
     val medium: String?,
     val repository: String?,
-    val department: String?
+    val department: String?,
+    val objectURL: String?
+)
+
+data class MetDepartmentsResponse(
+    val departments: List<MetDepartment>
+)
+
+data class MetDepartment(
+    val departmentId: Int,
+    val displayName: String
 )

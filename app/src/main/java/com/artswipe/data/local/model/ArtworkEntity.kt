@@ -14,5 +14,6 @@ data class ArtworkEntity(
     val styleMovement: String,
     val medium: String?,
     val description: String,
-    val department: String?
+    val department: String?,
+    val sourceUrl: String? = null
 )

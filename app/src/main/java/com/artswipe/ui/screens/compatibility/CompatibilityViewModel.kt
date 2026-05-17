@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.artswipe.domain.model.User
 import com.artswipe.domain.repository.AuthRepository
+import com.artswipe.domain.util.StyleEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,8 @@ data class ComparisonResult(
     val score: Float,
     val label: String,
     val sharedStyles: List<SharedStyle>,
-    val differences: List<String>
+    val differences: List<String>,
+    val isLimitedData: Boolean
 )
 
 data class SharedStyle(
@@ -75,7 +77,7 @@ class CompatibilityViewModel @Inject constructor(
         val scoresA = userA.styleScores
         val scoresB = userB.styleScores
         
-        val allStyles = scoresA.keys + scoresB.keys
+        val allStyles = (scoresA.keys + scoresB.keys).distinct()
         val totalA = scoresA.values.sum().toFloat().coerceAtLeast(1f)
         val totalB = scoresB.values.sum().toFloat().coerceAtLeast(1f)
 
@@ -119,7 +121,8 @@ class CompatibilityViewModel @Inject constructor(
             score = score,
             label = label,
             sharedStyles = sharedStylesList.sortedByDescending { minOf(it.scoreA, it.scoreB) },
-            differences = diffs
+            differences = diffs,
+            isLimitedData = userB.totalSwipes < 10
         )
     }
 }

@@ -4,11 +4,11 @@ import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Recommend
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
@@ -20,21 +20,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
 import com.artswipe.domain.model.StylePercentage
 import com.artswipe.domain.model.StyleProfile
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
-    onBack: () -> Unit,
     onNavigateToAuth: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToCompatibility: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val user by viewModel.currentUser.collectAsState()
@@ -48,17 +52,20 @@ fun ProfileScreen(
     }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Your Taste Profile") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.signOut() }) {
-                        Icon(Icons.Default.Settings, contentDescription = "Sign Out")
+                    IconButton(onClick = onNavigateToSettings) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
                     }
                 }
             )
@@ -90,14 +97,14 @@ fun ProfileScreen(
                     ) {
                         Icon(Icons.Default.Recommend, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Recommendations")
+                        Text("Explore")
                     }
                     Button(
                         onClick = onNavigateToCompatibility,
                         modifier = Modifier.weight(1f),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Icon(Icons.Default.CompareArrows, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Compare")
                     }
@@ -119,8 +126,8 @@ fun ProfileScreen(
             }
 
             styleProfile?.let { profile ->
-                items(profile.styleBreakdown) { styleItem ->
-                    StyleRow(styleItem)
+                itemsIndexed(profile.styleBreakdown) { index, styleItem ->
+                    StyleRow(index, styleItem)
                 }
             }
             
@@ -280,17 +287,44 @@ fun StyleBreakdownSection(breakdown: List<StylePercentage>) {
 }
 
 @Composable
-fun StyleRow(item: StylePercentage) {
+fun StyleRow(index: Int, item: StylePercentage) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(text = item.style, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
         Text(
-            text = "${item.likeCount} Likes",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "#${index + 1}",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(32.dp)
+        )
+        AsyncImage(
+            model = item.thumbnailUrl,
+            contentDescription = null,
+            modifier = Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentScale = ContentScale.Crop
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.style,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "${item.likeCount} Likes",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            text = "${item.percentage.toInt()}%",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.primary
         )
     }
 }

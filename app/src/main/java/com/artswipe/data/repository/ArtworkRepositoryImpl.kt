@@ -21,6 +21,8 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val firestore: FirebaseFirestore
 ) : ArtworkRepository {
 
+    // Target departments for style diversity: 11 (European Paintings), 21 (Modern Art), 9 (Antiquities)
+    private val metDepartments = listOf(11, 21, 9)
     private val styles = listOf("Impressionism", "Baroque", "Modernism", "Surrealism", "Realism", "Abstract", "Renaissance")
 
     override fun getArtworkQueue(): Flow<List<Artwork>> {
@@ -30,11 +32,17 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     override suspend fun fetchMoreArtworks() {
-        // Fetch from Met with more diversity
+        // Fetch from Met with specific department filters for style diversity
         try {
             val randomStyle = styles.random()
-            val metSearch = metApi.search(randomStyle)
-            metSearch.objectIDs?.shuffled()?.take(10)?.forEach { id ->
+            val randomDept = metDepartments.random()
+            
+            val metSearch = metApi.search(
+                query = randomStyle,
+                departmentId = randomDept
+            )
+            
+            metSearch.objectIDs?.shuffled()?.take(15)?.forEach { id ->
                 val metObj = metApi.getObject(id)
                 if (metObj.primaryImage?.isNotEmpty() == true) {
                     val entity = ArtworkEntity(
@@ -44,10 +52,11 @@ class ArtworkRepositoryImpl @Inject constructor(
                         artist = metObj.artistDisplayName ?: "Unknown Artist",
                         year = metObj.objectDate,
                         imageUrl = metObj.primaryImage,
-                        styleMovement = randomStyle,
+                        styleMovement = randomStyle, // Tagged based on search term
                         medium = metObj.medium,
                         description = "A magnificent piece from the Met Museum's ${metObj.department ?: "collection"}.",
-                        department = metObj.department
+                        department = metObj.department,
+                        sourceUrl = metObj.objectURL
                     )
                     artworkDao.insertArtworks(listOf(entity))
                 }
@@ -56,13 +65,16 @@ class ArtworkRepositoryImpl @Inject constructor(
             e.printStackTrace()
         }
 
-        // Fetch from AIC
+        // Fetch from AIC using random pages for discovery
         try {
-            val aicResponse = aicApi.getArtworks(page = (1..50).random(), limit = 15)
+            val aicResponse = aicApi.getArtworks(page = (1..100).random(), limit = 15)
             val iiifBaseUrl = aicResponse.config.iiif_url
             aicResponse.data.forEach { aicArt ->
                 if (aicArt.image_id != null) {
                     val imageUrl = "$iiifBaseUrl/${aicArt.image_id}/full/843,/0/default.jpg"
+                    // Map AIC's style_title to our recognized styles or default to "Modernism"
+                    val style = aicArt.style_title ?: styles.random() 
+                    
                     val entity = ArtworkEntity(
                         id = "aic_${aicArt.id}",
                         source = "aic",
@@ -70,10 +82,11 @@ class ArtworkRepositoryImpl @Inject constructor(
                         artist = aicArt.artist_display ?: "Unknown Artist",
                         year = aicArt.date_display,
                         imageUrl = imageUrl,
-                        styleMovement = aicArt.style_title ?: "Modernism",
+                        styleMovement = style,
                         medium = aicArt.medium_display,
                         description = "An intriguing work from the Art Institute of Chicago's ${aicArt.department_title ?: "collection"}.",
-                        department = aicArt.department_title
+                        department = aicArt.department_title,
+                        sourceUrl = aicArt.websiteUrl
                     )
                     artworkDao.insertArtworks(listOf(entity))
                 }
@@ -116,22 +129,16 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     override suspend fun removeSwipeRecord(userId: String, artworkId: String, styleMovement: String) {
-        // Find if it was liked or disliked
         val lastSwipe = artworkDao.getLatestSwipeForArtwork(artworkId)
         val wasLiked = lastSwipe?.liked ?: return
 
-        // 1. Remove from local DB
         artworkDao.deleteSwipeRecordForArtwork(artworkId)
 
-        // 2. Update Firestore scores
         val scoreDecrement = if (wasLiked) -2L else 1L
         firestore.collection("users").document(userId).update(
             "totalSwipes", FieldValue.increment(-1),
             "styleScores.$styleMovement", FieldValue.increment(scoreDecrement)
         )
-        
-        // Note: For simplicity, we aren't deleting the specific document in the 'swipes' collection 
-        // because we don't have its ID easily here, but the scores are adjusted.
     }
 
     override fun getLikedArtworks(): Flow<List<Artwork>> {
@@ -141,7 +148,6 @@ class ArtworkRepositoryImpl @Inject constructor(
     }
 
     override fun getRecommendations(topStyles: List<String>): Flow<List<Artwork>> {
-        // Simple recommendation: unswiped artworks that match top styles
         return artworkDao.getUnswipedArtworks().map { entities ->
             entities.filter { it.styleMovement in topStyles }.map { it.toDomain() }
         }
@@ -157,6 +163,7 @@ class ArtworkRepositoryImpl @Inject constructor(
         styleMovement = styleMovement,
         medium = medium,
         description = description,
-        department = department
+        department = department,
+        sourceUrl = sourceUrl
     )
 }

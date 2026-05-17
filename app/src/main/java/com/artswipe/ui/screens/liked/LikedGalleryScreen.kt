@@ -1,5 +1,6 @@
 package com.artswipe.ui.screens.liked
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -7,7 +8,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -27,25 +28,29 @@ import com.artswipe.domain.model.Artwork
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LikedGalleryScreen(
-    onBack: () -> Unit,
     onNavigateToExplanation: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     viewModel: LikedGalleryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Liked Artworks (${uiState.artworks.size})") },
+                title = { Text("Liked Gallery") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 }
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding)) {
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             // Style Filters
             ScrollableTabRow(
                 selectedTabIndex = if (uiState.selectedStyle == null) 0 else uiState.styles.indexOf(uiState.selectedStyle) + 1,
@@ -121,17 +126,16 @@ fun LikedArtworkCard(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp))
+                    .background(Color.Black.copy(alpha = 0.5f))
                     .padding(8.dp)
             ) {
-                Column {
-                    Text(
-                        text = artwork.title,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
-                }
+                Text(
+                    text = artwork.title,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    maxLines = 1
+                )
             }
             
             // Unlike Button

@@ -55,6 +55,18 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun signInWithGoogle(idToken: String) {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            val result = authRepository.signInWithGoogle(idToken)
+            if (result.isSuccess) {
+                _uiState.value = _uiState.value.copy(isLoading = false, isSuccess = true)
+            } else {
+                _uiState.value = _uiState.value.copy(isLoading = false, error = result.exceptionOrNull()?.message)
+            }
+        }
+    }
+
     fun sendPasswordReset(email: String) {
         if (email.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "Please enter your email")

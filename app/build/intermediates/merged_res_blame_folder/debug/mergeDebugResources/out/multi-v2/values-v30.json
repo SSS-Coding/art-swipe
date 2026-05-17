@@ -1,0 +1,19 @@
+{
+    "logs": [
+        {
+            "outputFile": "com.artswipe.app-mergeDebugResources-82:/values-v30/values-v30.xml",
+            "map": [
+                {
+                    "source": "C:\\Users\\grays\\.gradle\\caches\\9.0.0\\transforms\\afda89280a562d0c947006691eeee2df\\transformed\\material3-release\\res\\values-v30\\values-v30.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "72",
+                        "endOffsets": "123"
+                    }
+                }
+            ]
+        }
+    ]
+}

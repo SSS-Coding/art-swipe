@@ -11,5 +11,6 @@ data class StyleProfile(
 data class StylePercentage(
     val style: String,
     val percentage: Float,
-    val likeCount: Int
+    val likeCount: Int,
+    val thumbnailUrl: String? = null
 )

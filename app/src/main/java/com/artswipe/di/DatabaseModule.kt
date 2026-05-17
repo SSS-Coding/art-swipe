@@ -22,7 +22,9 @@ object DatabaseModule {
             context,
             ArtDatabase::class.java,
             "art_swipe_db"
-        ).build()
+        )
+        .fallbackToDestructiveMigration()
+        .build()
     }
 
     @Provides

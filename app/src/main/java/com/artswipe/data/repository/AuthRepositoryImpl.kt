@@ -3,6 +3,7 @@ package com.artswipe.data.repository
 import com.artswipe.domain.model.User
 import com.artswipe.domain.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -31,7 +32,8 @@ class AuthRepositoryImpl @Inject constructor(
                         if (document != null && document.exists()) {
                             trySend(document.toUser(firebaseUser.email ?: ""))
                         } else {
-                            trySend(User(userId = firebaseUser.uid, displayName = "", email = firebaseUser.email ?: "", joinDate = ""))
+                            // If doc doesn't exist, create it (e.g. after Google sign in)
+                            createInitialUserDoc(firebaseUser.uid, firebaseUser.displayName ?: "New User")
                         }
                     }
                     .addOnFailureListener {
@@ -56,24 +58,37 @@ class AuthRepositoryImpl @Inject constructor(
         return try {
             val result = firebaseAuth.createUserWithEmailAndPassword(email, pass).await()
             val firebaseUser = result.user ?: throw Exception("User creation failed")
-            
-            val shareCode = "ART-${UUID.randomUUID().toString().take(4).uppercase()}"
-            val joinDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-            
-            val userDoc = mapOf(
-                "userId" to firebaseUser.uid,
-                "displayName" to displayName,
-                "joinDate" to joinDate,
-                "totalSwipes" to 0,
-                "styleScores" to emptyMap<String, Int>(),
-                "shareCode" to shareCode
-            )
-            
-            firestore.collection("users").document(firebaseUser.uid).set(userDoc).await()
+            createInitialUserDoc(firebaseUser.uid, displayName)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    override suspend fun signInWithGoogle(idToken: String): Result<Unit> {
+        return try {
+            val credential = GoogleAuthProvider.getCredential(idToken, null)
+            firebaseAuth.signInWithCredential(credential).await()
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    private fun createInitialUserDoc(uid: String, displayName: String) {
+        val shareCode = "ART-${UUID.randomUUID().toString().take(4).uppercase()}"
+        val joinDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        
+        val userDoc = mapOf(
+            "userId" to uid,
+            "displayName" to displayName,
+            "joinDate" to joinDate,
+            "totalSwipes" to 0,
+            "styleScores" to emptyMap<String, Int>(),
+            "shareCode" to shareCode
+        )
+        
+        firestore.collection("users").document(uid).set(userDoc)
     }
 
     override suspend fun signOut() {
