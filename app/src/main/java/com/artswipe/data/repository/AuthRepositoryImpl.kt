@@ -4,7 +4,9 @@ import com.artswipe.domain.model.User
 import com.artswipe.domain.repository.AuthRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.FirebaseAuth.AuthStateListener
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -14,35 +16,54 @@ import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val firebaseAuth: FirebaseAuth,
     private val firestore: FirebaseFirestore
 ) : AuthRepository {
 
     override val currentUser: Flow<User?> = callbackFlow {
+        var snapshotListener: ListenerRegistration? = null
+        
         val authListener = FirebaseAuth.AuthStateListener { auth ->
             val firebaseUser = auth.currentUser
+            snapshotListener?.remove()
+            
             if (firebaseUser == null) {
                 trySend(null)
             } else {
-                firestore.collection("users").document(firebaseUser.uid)
-                    .get()
-                    .addOnSuccessListener { document ->
-                        if (document != null && document.exists()) {
-                            trySend(document.toUser(firebaseUser.email ?: ""))
-                        } else {
-                            // If doc doesn't exist, create it (e.g. after Google sign in)
-                            createInitialUserDoc(firebaseUser.uid, firebaseUser.displayName ?: "New User")
+                snapshotListener = firestore.collection("users").document(firebaseUser.uid)
+                    .addSnapshotListener { document, error ->
+                        if (error != null) {
+                            return@addSnapshotListener
                         }
-                    }
-                    .addOnFailureListener {
-                        trySend(null)
+                        
+                        if (document != null && document.exists()) {
+                            val user = User(
+                                userId = firebaseUser.uid,
+                                displayName = document.getString("displayName") ?: "",
+                                email = firebaseUser.email ?: "",
+                                joinDate = document.getString("joinDate") ?: "",
+                                totalSwipes = document.getLong("totalSwipes")?.toInt() ?: 0,
+                                styleScores = (document.get("styleScores") as? Map<String, Long>)
+                                    ?.mapValues { it.value.toInt() } ?: emptyMap(),
+                                shareCode = document.getString("shareCode") ?: ""
+                            )
+                            trySend(user)
+                        } else {
+                            trySend(User(userId = firebaseUser.uid, displayName = firebaseUser.displayName ?: "", email = firebaseUser.email ?: "", joinDate = ""))
+                        }
                     }
             }
         }
+
         firebaseAuth.addAuthStateListener(authListener)
-        awaitClose { firebaseAuth.removeAuthStateListener(authListener) }
+        awaitClose { 
+            firebaseAuth.removeAuthStateListener(authListener)
+            snapshotListener?.remove()
+        }
     }
 
     override suspend fun signInWithEmail(email: String, pass: String): Result<Unit> {
@@ -58,7 +79,7 @@ class AuthRepositoryImpl @Inject constructor(
         return try {
             val result = firebaseAuth.createUserWithEmailAndPassword(email, pass).await()
             val firebaseUser = result.user ?: throw Exception("User creation failed")
-            createInitialUserDoc(firebaseUser.uid, displayName)
+            createInitialUserDocAsync(firebaseUser.uid, displayName)
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -75,7 +96,7 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    private fun createInitialUserDoc(uid: String, displayName: String) {
+    private suspend fun createInitialUserDocAsync(uid: String, displayName: String) {
         val shareCode = "ART-${UUID.randomUUID().toString().take(4).uppercase()}"
         val joinDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
         
@@ -88,7 +109,7 @@ class AuthRepositoryImpl @Inject constructor(
             "shareCode" to shareCode
         )
         
-        firestore.collection("users").document(uid).set(userDoc)
+        firestore.collection("users").document(uid).set(userDoc).await()
     }
 
     override suspend fun signOut() {
@@ -116,23 +137,20 @@ class AuthRepositoryImpl @Inject constructor(
                 Result.success(null)
             } else {
                 val doc = query.documents.first()
-                Result.success(doc.toUser("")) // Email is private
+                val user = User(
+                    userId = doc.getString("userId") ?: "",
+                    displayName = doc.getString("displayName") ?: "",
+                    email = "", 
+                    joinDate = doc.getString("joinDate") ?: "",
+                    totalSwipes = doc.getLong("totalSwipes")?.toInt() ?: 0,
+                    styleScores = (doc.get("styleScores") as? Map<String, Long>)
+                        ?.mapValues { it.value.toInt() } ?: emptyMap(),
+                    shareCode = doc.getString("shareCode") ?: ""
+                )
+                Result.success(user)
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
-    }
-
-    private fun com.google.firebase.firestore.DocumentSnapshot.toUser(email: String): User {
-        return User(
-            userId = getString("userId") ?: "",
-            displayName = getString("displayName") ?: "",
-            email = email,
-            joinDate = getString("joinDate") ?: "",
-            totalSwipes = getLong("totalSwipes")?.toInt() ?: 0,
-            styleScores = (get("styleScores") as? Map<String, Long>)
-                ?.mapValues { it.value.toInt() } ?: emptyMap(),
-            shareCode = getString("shareCode") ?: ""
-        )
     }
 }

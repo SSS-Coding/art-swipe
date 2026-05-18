@@ -23,7 +23,6 @@ import com.artswipe.di.NetworkModule_ProvideMetApiFactory;
 import com.artswipe.di.NetworkModule_ProvideMetRetrofitFactory;
 import com.artswipe.di.NetworkModule_ProvideOkHttpClientFactory;
 import com.artswipe.domain.repository.ArtworkRepository;
-import com.artswipe.domain.repository.AuthRepository;
 import com.artswipe.ui.screens.auth.AuthViewModel;
 import com.artswipe.ui.screens.auth.AuthViewModel_HiltModules;
 import com.artswipe.ui.screens.compatibility.CompatibilityViewModel;
@@ -428,25 +427,28 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
     private static final class LazyClassKeyProvider {
       static String com_artswipe_ui_screens_auth_AuthViewModel = "com.artswipe.ui.screens.auth.AuthViewModel";
 
-      static String com_artswipe_ui_screens_profile_ProfileViewModel = "com.artswipe.ui.screens.profile.ProfileViewModel";
+      static String com_artswipe_ui_screens_discover_DiscoverViewModel = "com.artswipe.ui.screens.discover.DiscoverViewModel";
+
+      static String com_artswipe_ui_screens_liked_LikedGalleryViewModel = "com.artswipe.ui.screens.liked.LikedGalleryViewModel";
 
       static String com_artswipe_ui_screens_splash_SplashViewModel = "com.artswipe.ui.screens.splash.SplashViewModel";
 
       static String com_artswipe_ui_screens_compatibility_CompatibilityViewModel = "com.artswipe.ui.screens.compatibility.CompatibilityViewModel";
 
-      static String com_artswipe_ui_screens_discover_DiscoverViewModel = "com.artswipe.ui.screens.discover.DiscoverViewModel";
-
       static String com_artswipe_ui_screens_recommendations_RecommendationsViewModel = "com.artswipe.ui.screens.recommendations.RecommendationsViewModel";
 
-      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
+      static String com_artswipe_ui_screens_profile_ProfileViewModel = "com.artswipe.ui.screens.profile.ProfileViewModel";
 
-      static String com_artswipe_ui_screens_liked_LikedGalleryViewModel = "com.artswipe.ui.screens.liked.LikedGalleryViewModel";
+      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
 
       @KeepFieldType
       AuthViewModel com_artswipe_ui_screens_auth_AuthViewModel2;
 
       @KeepFieldType
-      ProfileViewModel com_artswipe_ui_screens_profile_ProfileViewModel2;
+      DiscoverViewModel com_artswipe_ui_screens_discover_DiscoverViewModel2;
+
+      @KeepFieldType
+      LikedGalleryViewModel com_artswipe_ui_screens_liked_LikedGalleryViewModel2;
 
       @KeepFieldType
       SplashViewModel com_artswipe_ui_screens_splash_SplashViewModel2;
@@ -455,16 +457,13 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
       CompatibilityViewModel com_artswipe_ui_screens_compatibility_CompatibilityViewModel2;
 
       @KeepFieldType
-      DiscoverViewModel com_artswipe_ui_screens_discover_DiscoverViewModel2;
-
-      @KeepFieldType
       RecommendationsViewModel com_artswipe_ui_screens_recommendations_RecommendationsViewModel2;
 
       @KeepFieldType
-      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
+      ProfileViewModel com_artswipe_ui_screens_profile_ProfileViewModel2;
 
       @KeepFieldType
-      LikedGalleryViewModel com_artswipe_ui_screens_liked_LikedGalleryViewModel2;
+      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
     }
   }
 
@@ -526,30 +525,30 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_artswipe_ui_screens_splash_SplashViewModel = "com.artswipe.ui.screens.splash.SplashViewModel";
+      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
 
       static String com_artswipe_ui_screens_liked_LikedGalleryViewModel = "com.artswipe.ui.screens.liked.LikedGalleryViewModel";
 
-      static String com_artswipe_ui_screens_auth_AuthViewModel = "com.artswipe.ui.screens.auth.AuthViewModel";
+      static String com_artswipe_ui_screens_splash_SplashViewModel = "com.artswipe.ui.screens.splash.SplashViewModel";
 
       static String com_artswipe_ui_screens_discover_DiscoverViewModel = "com.artswipe.ui.screens.discover.DiscoverViewModel";
 
       static String com_artswipe_ui_screens_profile_ProfileViewModel = "com.artswipe.ui.screens.profile.ProfileViewModel";
 
-      static String com_artswipe_ui_screens_compatibility_CompatibilityViewModel = "com.artswipe.ui.screens.compatibility.CompatibilityViewModel";
+      static String com_artswipe_ui_screens_auth_AuthViewModel = "com.artswipe.ui.screens.auth.AuthViewModel";
 
-      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
+      static String com_artswipe_ui_screens_compatibility_CompatibilityViewModel = "com.artswipe.ui.screens.compatibility.CompatibilityViewModel";
 
       static String com_artswipe_ui_screens_recommendations_RecommendationsViewModel = "com.artswipe.ui.screens.recommendations.RecommendationsViewModel";
 
       @KeepFieldType
-      SplashViewModel com_artswipe_ui_screens_splash_SplashViewModel2;
+      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
 
       @KeepFieldType
       LikedGalleryViewModel com_artswipe_ui_screens_liked_LikedGalleryViewModel2;
 
       @KeepFieldType
-      AuthViewModel com_artswipe_ui_screens_auth_AuthViewModel2;
+      SplashViewModel com_artswipe_ui_screens_splash_SplashViewModel2;
 
       @KeepFieldType
       DiscoverViewModel com_artswipe_ui_screens_discover_DiscoverViewModel2;
@@ -558,10 +557,10 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
       ProfileViewModel com_artswipe_ui_screens_profile_ProfileViewModel2;
 
       @KeepFieldType
-      CompatibilityViewModel com_artswipe_ui_screens_compatibility_CompatibilityViewModel2;
+      AuthViewModel com_artswipe_ui_screens_auth_AuthViewModel2;
 
       @KeepFieldType
-      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
+      CompatibilityViewModel com_artswipe_ui_screens_compatibility_CompatibilityViewModel2;
 
       @KeepFieldType
       RecommendationsViewModel com_artswipe_ui_screens_recommendations_RecommendationsViewModel2;
@@ -589,28 +588,28 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
       public T get() {
         switch (id) {
           case 0: // com.artswipe.ui.screens.auth.AuthViewModel 
-          return (T) new AuthViewModel(singletonCImpl.bindAuthRepositoryProvider.get());
+          return (T) new AuthViewModel(singletonCImpl.authRepositoryImplProvider.get());
 
           case 1: // com.artswipe.ui.screens.compatibility.CompatibilityViewModel 
-          return (T) new CompatibilityViewModel(singletonCImpl.bindAuthRepositoryProvider.get());
+          return (T) new CompatibilityViewModel(singletonCImpl.authRepositoryImplProvider.get());
 
           case 2: // com.artswipe.ui.screens.discover.DiscoverViewModel 
-          return (T) new DiscoverViewModel(singletonCImpl.bindArtworkRepositoryProvider.get(), singletonCImpl.bindAuthRepositoryProvider.get());
+          return (T) new DiscoverViewModel(singletonCImpl.bindArtworkRepositoryProvider.get(), singletonCImpl.authRepositoryImplProvider.get());
 
           case 3: // com.artswipe.ui.screens.explanation.ExplanationViewModel 
           return (T) new ExplanationViewModel(singletonCImpl.bindArtworkRepositoryProvider.get(), singletonCImpl.artworkDao());
 
           case 4: // com.artswipe.ui.screens.liked.LikedGalleryViewModel 
-          return (T) new LikedGalleryViewModel(singletonCImpl.bindArtworkRepositoryProvider.get(), singletonCImpl.bindAuthRepositoryProvider.get());
+          return (T) new LikedGalleryViewModel(singletonCImpl.bindArtworkRepositoryProvider.get(), singletonCImpl.authRepositoryImplProvider.get());
 
           case 5: // com.artswipe.ui.screens.profile.ProfileViewModel 
-          return (T) new ProfileViewModel(singletonCImpl.bindAuthRepositoryProvider.get(), singletonCImpl.bindArtworkRepositoryProvider.get());
+          return (T) new ProfileViewModel(singletonCImpl.authRepositoryImplProvider.get(), singletonCImpl.bindArtworkRepositoryProvider.get());
 
           case 6: // com.artswipe.ui.screens.recommendations.RecommendationsViewModel 
-          return (T) new RecommendationsViewModel(singletonCImpl.bindArtworkRepositoryProvider.get(), singletonCImpl.bindAuthRepositoryProvider.get());
+          return (T) new RecommendationsViewModel(singletonCImpl.bindArtworkRepositoryProvider.get(), singletonCImpl.authRepositoryImplProvider.get());
 
           case 7: // com.artswipe.ui.screens.splash.SplashViewModel 
-          return (T) new SplashViewModel(singletonCImpl.bindAuthRepositoryProvider.get());
+          return (T) new SplashViewModel(singletonCImpl.authRepositoryImplProvider.get());
 
           default: throw new AssertionError(id);
         }
@@ -698,8 +697,6 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
 
     private Provider<AuthRepositoryImpl> authRepositoryImplProvider;
 
-    private Provider<AuthRepository> bindAuthRepositoryProvider;
-
     private Provider<HttpLoggingInterceptor> provideLoggingInterceptorProvider;
 
     private Provider<OkHttpClient> provideOkHttpClientProvider;
@@ -732,8 +729,7 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
     private void initialize(final ApplicationContextModule applicationContextModuleParam) {
       this.provideFirebaseAuthProvider = DoubleCheck.provider(new SwitchingProvider<FirebaseAuth>(singletonCImpl, 1));
       this.provideFirebaseFirestoreProvider = DoubleCheck.provider(new SwitchingProvider<FirebaseFirestore>(singletonCImpl, 2));
-      this.authRepositoryImplProvider = new SwitchingProvider<>(singletonCImpl, 0);
-      this.bindAuthRepositoryProvider = DoubleCheck.provider((Provider) authRepositoryImplProvider);
+      this.authRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<AuthRepositoryImpl>(singletonCImpl, 0));
       this.provideLoggingInterceptorProvider = DoubleCheck.provider(new SwitchingProvider<HttpLoggingInterceptor>(singletonCImpl, 7));
       this.provideOkHttpClientProvider = DoubleCheck.provider(new SwitchingProvider<OkHttpClient>(singletonCImpl, 6));
       this.provideMetRetrofitProvider = DoubleCheck.provider(new SwitchingProvider<Retrofit>(singletonCImpl, 5));

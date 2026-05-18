@@ -8,13 +8,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CompareArrows
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Recommend
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -30,39 +28,28 @@ import coil.compose.AsyncImage
 import com.artswipe.domain.model.StylePercentage
 import com.artswipe.domain.model.StyleProfile
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    onNavigateToAuth: () -> Unit,
     onNavigateToRecommendations: () -> Unit,
     onNavigateToCompatibility: () -> Unit,
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier,
-    onBack: (() -> Unit)? = null,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val user by viewModel.currentUser.collectAsState()
     val styleProfile by viewModel.styleProfile.collectAsState()
     val context = LocalContext.current
 
-    LaunchedEffect(user) {
-        if (user == null) {
-            onNavigateToAuth()
-        }
-    }
+    // "Remember login" fix: Redirection is removed from this screen.
+    // Session state is managed at the top-level (MainScreen/NavGraph).
+    // This ensures that switching tabs doesn't kick the user out while data is loading.
 
     Scaffold(
         modifier = modifier,
         topBar = {
             CenterAlignedTopAppBar(
                 title = { Text("Your Taste Profile") },
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                        }
-                    }
-                },
                 actions = {
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "Settings")
@@ -71,76 +58,80 @@ fun ProfileScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            contentPadding = PaddingValues(bottom = 32.dp)
-        ) {
-            item {
-                styleProfile?.let { profile ->
-                    PersonalityCard(profile)
-                }
+        if (user == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
             }
-
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Button(
-                        onClick = onNavigateToRecommendations,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 12.dp)
-                    ) {
-                        Icon(Icons.Default.Recommend, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Explore")
-                    }
-                    Button(
-                        onClick = onNavigateToCompatibility,
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(vertical = 12.dp)
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Compare")
-                    }
-                }
-            }
-
-            item {
-                styleProfile?.let { profile ->
-                    StyleBreakdownSection(profile.styleBreakdown)
-                }
-            }
-
-            item {
-                Text(
-                    text = "Top Styles",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            styleProfile?.let { profile ->
-                itemsIndexed(profile.styleBreakdown) { index, styleItem ->
-                    StyleRow(index, styleItem)
-                }
-            }
-            
-            if (styleProfile == null || styleProfile?.styleBreakdown?.isEmpty() == true) {
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                contentPadding = PaddingValues(bottom = 32.dp)
+            ) {
                 item {
-                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        Text("Keep swiping to build your profile!", style = MaterialTheme.typography.bodyLarge)
+                    styleProfile?.let { profile ->
+                        PersonalityCard(profile)
                     }
                 }
-            }
 
-            item {
-                user?.let { u ->
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onNavigateToRecommendations,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.Default.Recommend, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Recs")
+                        }
+                        Button(
+                            onClick = onNavigateToCompatibility,
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.CompareArrows, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Compare")
+                        }
+                    }
+                }
+
+                item {
+                    styleProfile?.let { profile ->
+                        StyleBreakdownSection(profile.styleBreakdown)
+                    }
+                }
+
+                item {
+                    Text(
+                        text = "Top Styles",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                styleProfile?.let { profile ->
+                    itemsIndexed(profile.styleBreakdown) { index, styleItem ->
+                        StyleRow(index, styleItem)
+                    }
+                }
+                
+                if (styleProfile == null || styleProfile?.styleBreakdown?.isEmpty() == true) {
+                    item {
+                        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                            Text("Keep swiping to build your profile!", style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+
+                item {
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp)
@@ -154,12 +145,12 @@ fun ProfileScreen(
                         ) {
                             Column {
                                 Text(text = "Your Share Code", style = MaterialTheme.typography.labelMedium)
-                                Text(text = u.shareCode, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                Text(text = user?.shareCode ?: "", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             }
                             IconButton(onClick = {
                                 val sendIntent: Intent = Intent().apply {
                                     action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, "Check out my art taste on ArtSwipe! My code is: ${u.shareCode}. Download the app to compare!")
+                                    putExtra(Intent.EXTRA_TEXT, "Check out my art taste on ArtSwipe! My code is: ${user?.shareCode}. Download the app to compare!")
                                     type = "text/plain"
                                 }
                                 val shareIntent = Intent.createChooser(sendIntent, null)

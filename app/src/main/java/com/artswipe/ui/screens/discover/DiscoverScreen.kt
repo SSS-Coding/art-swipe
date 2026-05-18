@@ -11,7 +11,6 @@ import com.artswipe.ui.screens.discover.components.SwipeableCard
 
 @Composable
 fun DiscoverScreen(
-    onNavigateToExplanation: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: DiscoverViewModel = hiltViewModel()
 ) {
@@ -29,18 +28,16 @@ fun DiscoverScreen(
         } else if (artworkQueue.isEmpty()) {
             Text("No more art for now. Check back later!")
         } else {
-            // Render top items. Using reversed to show first item on top of the stack.
+            // Quick Swipes: Swiping no longer navigates to explanation screen automatically.
             artworkQueue.take(2).reversed().forEach { artwork ->
                 key(artwork.id) {
                     SwipeableCard(
                         artwork = artwork,
                         onSwipeLeft = {
                             viewModel.onSwipe(artwork, false)
-                            onNavigateToExplanation(artwork.id)
                         },
                         onSwipeRight = {
                             viewModel.onSwipe(artwork, true)
-                            onNavigateToExplanation(artwork.id)
                         }
                     )
                 }
