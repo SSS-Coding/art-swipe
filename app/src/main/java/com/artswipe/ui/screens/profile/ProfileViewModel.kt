@@ -23,6 +23,10 @@ class ProfileViewModel @Inject constructor(
     val currentUser: StateFlow<User?> = authRepository.currentUser
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val authStateResolved: StateFlow<Boolean> = authRepository.currentUser
+        .map { true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
     val styleProfile: StateFlow<StyleProfile?> = combine(
         authRepository.currentUser,
         artworkRepository.getLikedArtworks()
