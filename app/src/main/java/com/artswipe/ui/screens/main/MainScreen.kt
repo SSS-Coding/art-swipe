@@ -28,11 +28,10 @@ fun MainScreen(
     val icons = listOf(Icons.Default.Swipe, Icons.Default.Person, Icons.Default.Favorite)
     
     val user by viewModel.currentUser.collectAsState()
+    val authStateResolved by viewModel.authStateResolved.collectAsState()
 
-    // Global session check: only navigate to auth if we are CERTAIN there is no session.
-    // This is the "Remember login" fix - we handle logout at the top level.
-    LaunchedEffect(user) {
-        if (user == null) {
+    LaunchedEffect(authStateResolved, user) {
+        if (authStateResolved && user == null) {
             onNavigateToAuth()
         }
     }
