@@ -28,7 +28,7 @@ import coil.compose.AsyncImage
 import com.artswipe.domain.model.StylePercentage
 import com.artswipe.domain.model.StyleProfile
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ProfileScreen(
     onNavigateToRecommendations: () -> Unit,
@@ -40,10 +40,6 @@ fun ProfileScreen(
     val user by viewModel.currentUser.collectAsState()
     val styleProfile by viewModel.styleProfile.collectAsState()
     val context = LocalContext.current
-
-    // "Remember login" fix: Redirection is removed from this screen.
-    // Session state is managed at the top-level (MainScreen/NavGraph).
-    // This ensures that switching tabs doesn't kick the user out while data is loading.
 
     Scaffold(
         modifier = modifier,
@@ -106,6 +102,34 @@ fun ProfileScreen(
                 item {
                     styleProfile?.let { profile ->
                         StyleBreakdownSection(profile.styleBreakdown)
+                    }
+                }
+
+                if (styleProfile?.leastLikedStyles?.isNotEmpty() == true) {
+                    item {
+                        Column {
+                            Text(
+                                text = "Styles You're Not Into",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                styleProfile?.leastLikedStyles?.forEach { style ->
+                                    SuggestionChip(
+                                        onClick = { },
+                                        label = { Text(style) },
+                                        colors = SuggestionChipDefaults.suggestionChipColors(
+                                            labelColor = MaterialTheme.colorScheme.error
+                                        )
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
 

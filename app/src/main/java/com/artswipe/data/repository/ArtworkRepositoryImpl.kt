@@ -28,7 +28,8 @@ class ArtworkRepositoryImpl @Inject constructor(
 
     override fun getArtworkQueue(): Flow<List<Artwork>> {
         return artworkDao.getUnswipedArtworks().map { entities ->
-            entities.map { it.toDomain() }
+            // Randomize the queue so it's not in genre order
+            entities.shuffled().map { it.toDomain() }
         }
     }
 
@@ -112,21 +113,42 @@ class ArtworkRepositoryImpl @Inject constructor(
             )
         )
 
-        val swipeData = mapOf(
+        val artwork = artworkDao.getArtworkById(record.artworkId)
+        val swipeData = mutableMapOf(
             "artworkId" to record.artworkId,
             "liked" to record.liked,
             "timestamp" to record.timestamp,
             "styleMovement" to record.styleMovement
         )
         
+        // If liked, save full artwork info so it can be synced to other devices
+        artwork?.let {
+            swipeData["title"] = it.title
+            swipeData["artist"] = it.artist
+            swipeData["imageUrl"] = it.imageUrl
+            swipeData["source"] = it.source
+            swipeData["year"] = it.year ?: ""
+            swipeData["medium"] = it.medium ?: ""
+            swipeData["description"] = it.description
+            swipeData["department"] = it.department ?: ""
+            swipeData["sourceUrl"] = it.sourceUrl ?: ""
+        }
+        
         firestore.collection("users").document(record.userId)
             .collection("swipes").document(record.artworkId).set(swipeData)
 
-        val scoreIncrement = if (record.liked) 2L else -1L
-        firestore.collection("users").document(record.userId).update(
-            "totalSwipes", FieldValue.increment(1),
-            "styleScores.${record.styleMovement}", FieldValue.increment(scoreIncrement)
-        )
+        if (record.liked) {
+            firestore.collection("users").document(record.userId).update(
+                "totalSwipes", FieldValue.increment(1),
+                "styleScores.${record.styleMovement}", FieldValue.increment(2)
+            )
+        } else {
+            firestore.collection("users").document(record.userId).update(
+                "totalSwipes", FieldValue.increment(1),
+                "styleScores.${record.styleMovement}", FieldValue.increment(-1),
+                "styleDislikes.${record.styleMovement}", FieldValue.increment(1)
+            )
+        }
     }
 
     override suspend fun removeSwipeRecord(userId: String, artworkId: String, styleMovement: String) {
@@ -138,11 +160,18 @@ class ArtworkRepositoryImpl @Inject constructor(
         firestore.collection("users").document(userId)
             .collection("swipes").document(artworkId).delete()
 
-        val scoreDecrement = if (wasLiked) -2L else 1L
-        firestore.collection("users").document(userId).update(
-            "totalSwipes", FieldValue.increment(-1),
-            "styleScores.$styleMovement", FieldValue.increment(scoreDecrement)
-        )
+        if (wasLiked) {
+            firestore.collection("users").document(userId).update(
+                "totalSwipes", FieldValue.increment(-1),
+                "styleScores.$styleMovement", FieldValue.increment(-2)
+            )
+        } else {
+            firestore.collection("users").document(userId).update(
+                "totalSwipes", FieldValue.increment(-1),
+                "styleScores.$styleMovement", FieldValue.increment(1),
+                "styleDislikes.$styleMovement", FieldValue.increment(-1)
+            )
+        }
     }
 
     override fun getLikedArtworks(): Flow<List<Artwork>> {
@@ -153,18 +182,20 @@ class ArtworkRepositoryImpl @Inject constructor(
 
     override fun getRecommendations(topStyles: List<String>): Flow<List<Artwork>> {
         return artworkDao.getUnswipedArtworks().map { entities ->
-            entities.filter { it.styleMovement in topStyles }.map { it.toDomain() }
+            entities.filter { it.styleMovement in topStyles }.shuffled().map { it.toDomain() }
         }
     }
 
     override suspend fun resetPreferences(userId: String) {
-        // Clear local swipes
+        // Clear local swipes AND artworks so user can "look at everything again" fresh
         artworkDao.clearAllSwipeRecords()
+        artworkDao.clearAll() // Clear artworks table too
         
         // Reset Firestore scores and swipes
         firestore.collection("users").document(userId).update(
             "totalSwipes", 0,
-            "styleScores", emptyMap<String, Int>()
+            "styleScores", emptyMap<String, Int>(),
+            "styleDislikes", emptyMap<String, Int>()
         ).await()
         
         val swipesRef = firestore.collection("users").document(userId).collection("swipes")
@@ -172,24 +203,42 @@ class ArtworkRepositoryImpl @Inject constructor(
         for (doc in swipes.documents) {
             doc.reference.delete()
         }
+        
+        // Trigger a fresh fetch after reset
+        fetchMoreArtworks()
     }
 
     override suspend fun syncLikedArtworksFromRemote(userId: String) {
         try {
             val swipes = firestore.collection("users").document(userId)
                 .collection("swipes")
-                .whereEqualTo("liked", true)
                 .get()
                 .await()
             
             for (doc in swipes.documents) {
                 val artworkId = doc.getString("artworkId") ?: continue
                 val styleMovement = doc.getString("styleMovement") ?: ""
-                val liked = doc.getBoolean("liked") ?: true
+                val liked = doc.getBoolean("liked") ?: false
                 val timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
                 
-                // If we don't have the artwork locally, we might need to fetch it or skip
-                // For now, just ensure the swipe record exists locally
+                // Restore Artwork Entity if it was liked (so it shows in gallery)
+                if (liked) {
+                    val artworkEntity = ArtworkEntity(
+                        id = artworkId,
+                        source = doc.getString("source") ?: "unknown",
+                        title = doc.getString("title") ?: "Untitled",
+                        artist = doc.getString("artist") ?: "Unknown Artist",
+                        year = doc.getString("year"),
+                        imageUrl = doc.getString("imageUrl") ?: "",
+                        styleMovement = styleMovement,
+                        medium = doc.getString("medium"),
+                        description = doc.getString("description") ?: "",
+                        department = doc.getString("department"),
+                        sourceUrl = doc.getString("sourceUrl")
+                    )
+                    artworkDao.insertArtworks(listOf(artworkEntity))
+                }
+
                 artworkDao.insertSwipeRecord(
                     SwipeRecordEntity(
                         userId = userId,
