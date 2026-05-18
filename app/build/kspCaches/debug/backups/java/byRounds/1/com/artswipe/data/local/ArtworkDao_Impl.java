@@ -44,6 +44,8 @@ public final class ArtworkDao_Impl implements ArtworkDao {
 
   private final SharedSQLiteStatement __preparedStmtOfDeleteSwipeRecordForArtwork;
 
+  private final SharedSQLiteStatement __preparedStmtOfClearAllSwipeRecords;
+
   public ArtworkDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
     this.__insertionAdapterOfArtworkEntity = new EntityInsertionAdapter<ArtworkEntity>(__db) {
@@ -125,6 +127,14 @@ public final class ArtworkDao_Impl implements ArtworkDao {
       @NonNull
       public String createQuery() {
         final String _query = "DELETE FROM swipe_records WHERE artworkId = ?";
+        return _query;
+      }
+    };
+    this.__preparedStmtOfClearAllSwipeRecords = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "DELETE FROM swipe_records";
         return _query;
       }
     };
@@ -237,6 +247,29 @@ public final class ArtworkDao_Impl implements ArtworkDao {
           }
         } finally {
           __preparedStmtOfDeleteSwipeRecordForArtwork.release(_stmt);
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object clearAllSwipeRecords(final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfClearAllSwipeRecords.acquire();
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfClearAllSwipeRecords.release(_stmt);
         }
       }
     }, $completion);

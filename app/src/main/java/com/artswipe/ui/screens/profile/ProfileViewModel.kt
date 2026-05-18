@@ -21,6 +21,12 @@ class ProfileViewModel @Inject constructor(
 ) : ViewModel() {
 
     val currentUser: StateFlow<User?> = authRepository.currentUser
+        .onEach { user ->
+            user?.let {
+                // Sync likes when user is loaded
+                artworkRepository.syncLikedArtworksFromRemote(it.userId)
+            }
+        }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val authStateResolved: StateFlow<Boolean> = authRepository.currentUser
@@ -64,6 +70,13 @@ class ProfileViewModel @Inject constructor(
     fun signOut() {
         viewModelScope.launch {
             authRepository.signOut()
+        }
+    }
+
+    fun resetPreferences() {
+        val userId = currentUser.value?.userId ?: return
+        viewModelScope.launch {
+            artworkRepository.resetPreferences(userId)
         }
     }
 }

@@ -84,7 +84,7 @@ fun SwipeableCard(
             model = artwork.imageUrl,
             contentDescription = artwork.title,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Fit
         )
 
         // Title and Artist Overlay

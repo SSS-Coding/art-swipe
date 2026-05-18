@@ -4,10 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -21,6 +20,30 @@ fun SettingsScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val user by viewModel.currentUser.collectAsState()
+    var showResetDialog by remember { mutableStateOf(false) }
+
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("Reset Preferences") },
+            text = { Text("This will clear all your swipes and art preferences. This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.resetPreferences()
+                        showResetDialog = false
+                    }
+                ) {
+                    Text("Reset")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -55,6 +78,19 @@ fun SettingsScreen(
             )
             
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            ListItem(
+                headlineContent = { Text("Reset Preferences") },
+                supportingContent = { Text("Clear all swipes and style scores") },
+                leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
+                trailingContent = {
+                    TextButton(onClick = { showResetDialog = true }) {
+                        Text("Reset")
+                    }
+                }
+            )
+
+            Spacer(modifier = Modifier.weight(1f) )
             
             TextButton(
                 onClick = {

@@ -37,6 +37,9 @@ interface ArtworkDao {
     @Query("DELETE FROM swipe_records WHERE artworkId = :artworkId")
     suspend fun deleteSwipeRecordForArtwork(artworkId: String)
 
+    @Query("DELETE FROM swipe_records")
+    suspend fun clearAllSwipeRecords()
+
     @Query("SELECT * FROM artworks WHERE id NOT IN (SELECT artworkId FROM swipe_records)")
     fun getUnswipedArtworks(): Flow<List<ArtworkEntity>>
 

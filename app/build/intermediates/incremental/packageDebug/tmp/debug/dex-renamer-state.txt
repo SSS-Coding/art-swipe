@@ -1,4 +1,4 @@
-#Sun May 17 13:31:40 CDT 2026
+#Mon May 18 16:57:34 CDT 2026
 base.0=E\:\\artTinder\\art-tinder\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes.dex
 base.1=E\:\\artTinder\\art-tinder\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex
 base.10=E\:\\artTinder\\art-tinder\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\3\\classes.dex

@@ -425,13 +425,13 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_artswipe_ui_screens_auth_AuthViewModel = "com.artswipe.ui.screens.auth.AuthViewModel";
-
       static String com_artswipe_ui_screens_discover_DiscoverViewModel = "com.artswipe.ui.screens.discover.DiscoverViewModel";
 
-      static String com_artswipe_ui_screens_liked_LikedGalleryViewModel = "com.artswipe.ui.screens.liked.LikedGalleryViewModel";
+      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
 
-      static String com_artswipe_ui_screens_splash_SplashViewModel = "com.artswipe.ui.screens.splash.SplashViewModel";
+      static String com_artswipe_ui_screens_auth_AuthViewModel = "com.artswipe.ui.screens.auth.AuthViewModel";
+
+      static String com_artswipe_ui_screens_liked_LikedGalleryViewModel = "com.artswipe.ui.screens.liked.LikedGalleryViewModel";
 
       static String com_artswipe_ui_screens_compatibility_CompatibilityViewModel = "com.artswipe.ui.screens.compatibility.CompatibilityViewModel";
 
@@ -439,19 +439,19 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
 
       static String com_artswipe_ui_screens_profile_ProfileViewModel = "com.artswipe.ui.screens.profile.ProfileViewModel";
 
-      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
-
-      @KeepFieldType
-      AuthViewModel com_artswipe_ui_screens_auth_AuthViewModel2;
+      static String com_artswipe_ui_screens_splash_SplashViewModel = "com.artswipe.ui.screens.splash.SplashViewModel";
 
       @KeepFieldType
       DiscoverViewModel com_artswipe_ui_screens_discover_DiscoverViewModel2;
 
       @KeepFieldType
-      LikedGalleryViewModel com_artswipe_ui_screens_liked_LikedGalleryViewModel2;
+      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
 
       @KeepFieldType
-      SplashViewModel com_artswipe_ui_screens_splash_SplashViewModel2;
+      AuthViewModel com_artswipe_ui_screens_auth_AuthViewModel2;
+
+      @KeepFieldType
+      LikedGalleryViewModel com_artswipe_ui_screens_liked_LikedGalleryViewModel2;
 
       @KeepFieldType
       CompatibilityViewModel com_artswipe_ui_screens_compatibility_CompatibilityViewModel2;
@@ -463,7 +463,7 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
       ProfileViewModel com_artswipe_ui_screens_profile_ProfileViewModel2;
 
       @KeepFieldType
-      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
+      SplashViewModel com_artswipe_ui_screens_splash_SplashViewModel2;
     }
   }
 
@@ -525,27 +525,24 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
 
     @IdentifierNameString
     private static final class LazyClassKeyProvider {
-      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
-
-      static String com_artswipe_ui_screens_liked_LikedGalleryViewModel = "com.artswipe.ui.screens.liked.LikedGalleryViewModel";
+      static String com_artswipe_ui_screens_auth_AuthViewModel = "com.artswipe.ui.screens.auth.AuthViewModel";
 
       static String com_artswipe_ui_screens_splash_SplashViewModel = "com.artswipe.ui.screens.splash.SplashViewModel";
 
       static String com_artswipe_ui_screens_discover_DiscoverViewModel = "com.artswipe.ui.screens.discover.DiscoverViewModel";
 
-      static String com_artswipe_ui_screens_profile_ProfileViewModel = "com.artswipe.ui.screens.profile.ProfileViewModel";
-
-      static String com_artswipe_ui_screens_auth_AuthViewModel = "com.artswipe.ui.screens.auth.AuthViewModel";
-
-      static String com_artswipe_ui_screens_compatibility_CompatibilityViewModel = "com.artswipe.ui.screens.compatibility.CompatibilityViewModel";
+      static String com_artswipe_ui_screens_liked_LikedGalleryViewModel = "com.artswipe.ui.screens.liked.LikedGalleryViewModel";
 
       static String com_artswipe_ui_screens_recommendations_RecommendationsViewModel = "com.artswipe.ui.screens.recommendations.RecommendationsViewModel";
 
-      @KeepFieldType
-      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
+      static String com_artswipe_ui_screens_explanation_ExplanationViewModel = "com.artswipe.ui.screens.explanation.ExplanationViewModel";
+
+      static String com_artswipe_ui_screens_compatibility_CompatibilityViewModel = "com.artswipe.ui.screens.compatibility.CompatibilityViewModel";
+
+      static String com_artswipe_ui_screens_profile_ProfileViewModel = "com.artswipe.ui.screens.profile.ProfileViewModel";
 
       @KeepFieldType
-      LikedGalleryViewModel com_artswipe_ui_screens_liked_LikedGalleryViewModel2;
+      AuthViewModel com_artswipe_ui_screens_auth_AuthViewModel2;
 
       @KeepFieldType
       SplashViewModel com_artswipe_ui_screens_splash_SplashViewModel2;
@@ -554,16 +551,19 @@ public final class DaggerArtSwipeApp_HiltComponents_SingletonC {
       DiscoverViewModel com_artswipe_ui_screens_discover_DiscoverViewModel2;
 
       @KeepFieldType
-      ProfileViewModel com_artswipe_ui_screens_profile_ProfileViewModel2;
+      LikedGalleryViewModel com_artswipe_ui_screens_liked_LikedGalleryViewModel2;
 
       @KeepFieldType
-      AuthViewModel com_artswipe_ui_screens_auth_AuthViewModel2;
+      RecommendationsViewModel com_artswipe_ui_screens_recommendations_RecommendationsViewModel2;
+
+      @KeepFieldType
+      ExplanationViewModel com_artswipe_ui_screens_explanation_ExplanationViewModel2;
 
       @KeepFieldType
       CompatibilityViewModel com_artswipe_ui_screens_compatibility_CompatibilityViewModel2;
 
       @KeepFieldType
-      RecommendationsViewModel com_artswipe_ui_screens_recommendations_RecommendationsViewModel2;
+      ProfileViewModel com_artswipe_ui_screens_profile_ProfileViewModel2;
     }
 
     private static final class SwitchingProvider<T> implements Provider<T> {

@@ -12,4 +12,6 @@ interface ArtworkRepository {
     suspend fun removeSwipeRecord(userId: String, artworkId: String, styleMovement: String)
     fun getLikedArtworks(): Flow<List<Artwork>>
     fun getRecommendations(topStyles: List<String>): Flow<List<Artwork>>
+    suspend fun resetPreferences(userId: String)
+    suspend fun syncLikedArtworksFromRemote(userId: String)
 }
