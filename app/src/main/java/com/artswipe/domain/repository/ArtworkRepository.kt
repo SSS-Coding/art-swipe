@@ -14,4 +14,5 @@ interface ArtworkRepository {
     fun getRecommendations(topStyles: List<String>): Flow<List<Artwork>>
     suspend fun resetPreferences(userId: String)
     suspend fun syncLikedArtworksFromRemote(userId: String)
+    suspend fun reshuffleQueue()
 }

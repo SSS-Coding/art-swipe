@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
+import kotlin.random.Random
 
 class ArtworkRepositoryImpl @Inject constructor(
     private val metApi: MetApi,
@@ -28,8 +29,8 @@ class ArtworkRepositoryImpl @Inject constructor(
 
     override fun getArtworkQueue(): Flow<List<Artwork>> {
         return artworkDao.getUnswipedArtworks().map { entities ->
-            // Randomize the queue so it's not in genre order
-            entities.shuffled().map { it.toDomain() }
+            // Stability is handled by the DB 'ORDER BY randomOrder ASC'
+            entities.map { it.toDomain() }
         }
     }
 
@@ -44,24 +45,32 @@ class ArtworkRepositoryImpl @Inject constructor(
                 departmentId = randomDept
             )
             
+            val metEntities = mutableListOf<ArtworkEntity>()
             metSearch.objectIDs?.shuffled()?.take(15)?.forEach { id ->
-                val metObj = metApi.getObject(id)
-                if (metObj.primaryImage?.isNotEmpty() == true) {
-                    val entity = ArtworkEntity(
-                        id = "met_${metObj.objectID}",
-                        source = "met",
-                        title = metObj.title ?: "Untitled",
-                        artist = metObj.artistDisplayName ?: "Unknown Artist",
-                        year = metObj.objectDate,
-                        imageUrl = metObj.primaryImage,
-                        styleMovement = randomStyle, // Tagged based on search term
-                        medium = metObj.medium,
-                        description = "A magnificent piece from the Met Museum's ${metObj.department ?: "collection"}.",
-                        department = metObj.department,
-                        sourceUrl = metObj.objectURL
-                    )
-                    artworkDao.insertArtworks(listOf(entity))
+                try {
+                    val metObj = metApi.getObject(id)
+                    if (metObj.primaryImage?.isNotEmpty() == true) {
+                        metEntities.add(ArtworkEntity(
+                            id = "met_${metObj.objectID}",
+                            source = "met",
+                            title = metObj.title ?: "Untitled",
+                            artist = metObj.artistDisplayName ?: "Unknown Artist",
+                            year = metObj.objectDate,
+                            imageUrl = metObj.primaryImage,
+                            styleMovement = randomStyle,
+                            medium = metObj.medium,
+                            description = "A magnificent piece from the Met Museum's ${metObj.department ?: "collection"}.",
+                            department = metObj.department,
+                            sourceUrl = metObj.objectURL,
+                            randomOrder = Random.nextFloat()
+                        ))
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
+            }
+            if (metEntities.isNotEmpty()) {
+                artworkDao.insertArtworks(metEntities)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -71,13 +80,13 @@ class ArtworkRepositoryImpl @Inject constructor(
         try {
             val aicResponse = aicApi.getArtworks(page = (1..100).random(), limit = 15)
             val iiifBaseUrl = aicResponse.config.iiif_url
+            val aicEntities = mutableListOf<ArtworkEntity>()
             aicResponse.data.forEach { aicArt ->
                 if (aicArt.image_id != null) {
                     val imageUrl = "$iiifBaseUrl/${aicArt.image_id}/full/843,/0/default.jpg"
-                    // Map AIC's style_title to our recognized styles or default to "Modernism"
                     val style = aicArt.style_title ?: styles.random() 
                     
-                    val entity = ArtworkEntity(
+                    aicEntities.add(ArtworkEntity(
                         id = "aic_${aicArt.id}",
                         source = "aic",
                         title = aicArt.title ?: "Untitled",
@@ -88,10 +97,13 @@ class ArtworkRepositoryImpl @Inject constructor(
                         medium = aicArt.medium_display,
                         description = "An intriguing work from the Art Institute of Chicago's ${aicArt.department_title ?: "collection"}.",
                         department = aicArt.department_title,
-                        sourceUrl = aicArt.websiteUrl
-                    )
-                    artworkDao.insertArtworks(listOf(entity))
+                        sourceUrl = aicArt.websiteUrl,
+                        randomOrder = Random.nextFloat()
+                    ))
                 }
+            }
+            if (aicEntities.isNotEmpty()) {
+                artworkDao.insertArtworks(aicEntities)
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -182,14 +194,14 @@ class ArtworkRepositoryImpl @Inject constructor(
 
     override fun getRecommendations(topStyles: List<String>): Flow<List<Artwork>> {
         return artworkDao.getUnswipedArtworks().map { entities ->
-            entities.filter { it.styleMovement in topStyles }.shuffled().map { it.toDomain() }
+            entities.filter { it.styleMovement in topStyles }.map { it.toDomain() }
         }
     }
 
     override suspend fun resetPreferences(userId: String) {
         // Clear local swipes AND artworks so user can "look at everything again" fresh
         artworkDao.clearAllSwipeRecords()
-        artworkDao.clearAll() // Clear artworks table too
+        artworkDao.clearAll() 
         
         // Reset Firestore scores and swipes
         firestore.collection("users").document(userId).update(
@@ -215,6 +227,9 @@ class ArtworkRepositoryImpl @Inject constructor(
                 .get()
                 .await()
             
+            val entitiesToRestore = mutableListOf<ArtworkEntity>()
+            val recordsToInsert = mutableListOf<SwipeRecordEntity>()
+
             for (doc in swipes.documents) {
                 val artworkId = doc.getString("artworkId") ?: continue
                 val styleMovement = doc.getString("styleMovement") ?: ""
@@ -223,7 +238,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 
                 // Restore Artwork Entity if it was liked (so it shows in gallery)
                 if (liked) {
-                    val artworkEntity = ArtworkEntity(
+                    entitiesToRestore.add(ArtworkEntity(
                         id = artworkId,
                         source = doc.getString("source") ?: "unknown",
                         title = doc.getString("title") ?: "Untitled",
@@ -234,24 +249,32 @@ class ArtworkRepositoryImpl @Inject constructor(
                         medium = doc.getString("medium"),
                         description = doc.getString("description") ?: "",
                         department = doc.getString("department"),
-                        sourceUrl = doc.getString("sourceUrl")
-                    )
-                    artworkDao.insertArtworks(listOf(artworkEntity))
+                        sourceUrl = doc.getString("sourceUrl"),
+                        randomOrder = Random.nextFloat()
+                    ))
                 }
 
-                artworkDao.insertSwipeRecord(
-                    SwipeRecordEntity(
-                        userId = userId,
-                        artworkId = artworkId,
-                        liked = liked,
-                        timestamp = timestamp,
-                        styleMovement = styleMovement
-                    )
-                )
+                recordsToInsert.add(SwipeRecordEntity(
+                    userId = userId,
+                    artworkId = artworkId,
+                    liked = liked,
+                    timestamp = timestamp,
+                    styleMovement = styleMovement
+                ))
             }
+            
+            if (entitiesToRestore.isNotEmpty()) {
+                artworkDao.insertArtworks(entitiesToRestore)
+            }
+            recordsToInsert.forEach { artworkDao.insertSwipeRecord(it) }
+
         } catch (e: Exception) {
             e.printStackTrace()
         }
+    }
+
+    override suspend fun reshuffleQueue() {
+        artworkDao.reshuffleQueue()
     }
 
     private fun ArtworkEntity.toDomain() = Artwork(

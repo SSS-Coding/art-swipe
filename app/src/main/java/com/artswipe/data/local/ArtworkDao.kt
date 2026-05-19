@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ArtworkDao {
-    @Query("SELECT * FROM artworks")
+    @Query("SELECT * FROM artworks ORDER BY randomOrder ASC")
     fun getAllArtworks(): Flow<List<ArtworkEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -40,9 +40,12 @@ interface ArtworkDao {
     @Query("DELETE FROM swipe_records")
     suspend fun clearAllSwipeRecords()
 
-    @Query("SELECT * FROM artworks WHERE id NOT IN (SELECT artworkId FROM swipe_records)")
+    @Query("SELECT * FROM artworks WHERE id NOT IN (SELECT artworkId FROM swipe_records) ORDER BY randomOrder ASC")
     fun getUnswipedArtworks(): Flow<List<ArtworkEntity>>
 
     @Query("SELECT * FROM artworks WHERE id IN (SELECT artworkId FROM swipe_records WHERE liked = 1)")
     fun getLikedArtworks(): Flow<List<ArtworkEntity>>
+
+    @Query("UPDATE artworks SET randomOrder = ABS(RANDOM()) % 1000000 / 1000000.0")
+    suspend fun reshuffleQueue()
 }

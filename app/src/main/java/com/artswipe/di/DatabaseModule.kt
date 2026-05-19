@@ -21,7 +21,7 @@ object DatabaseModule {
         return Room.databaseBuilder(
             context,
             ArtDatabase::class.java,
-            "art_swipe_db"
+            "artswipe_new_stable_db"
         )
         .fallbackToDestructiveMigration()
         .build()
