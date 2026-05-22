@@ -7,5 +7,6 @@ data class User(
     val joinDate: String,
     val totalSwipes: Int = 0,
     val styleScores: Map<String, Int> = emptyMap(),
+    val styleDislikes: Map<String, Int> = emptyMap(),
     val shareCode: String = ""
 )

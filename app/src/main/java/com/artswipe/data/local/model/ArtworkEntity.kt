@@ -15,5 +15,6 @@ data class ArtworkEntity(
     val medium: String?,
     val description: String,
     val department: String?,
-    val sourceUrl: String? = null
+    val sourceUrl: String? = null,
+    val randomOrder: Float = 0f
 )

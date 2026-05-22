@@ -25,6 +25,7 @@ data class ComparisonResult(
     val score: Float,
     val label: String,
     val sharedStyles: List<SharedStyle>,
+    val sharedDislikes: List<String>,
     val differences: List<String>,
     val isLimitedData: Boolean
 )
@@ -76,6 +77,8 @@ class CompatibilityViewModel @Inject constructor(
     private fun computeCompatibility(userA: User, userB: User): ComparisonResult {
         val scoresA = userA.styleScores
         val scoresB = userB.styleScores
+        val dislikesA = userA.styleDislikes
+        val dislikesB = userB.styleDislikes
         
         val allStyles = (scoresA.keys + scoresB.keys).distinct()
         val totalA = scoresA.values.sum().toFloat().coerceAtLeast(1f)
@@ -95,7 +98,13 @@ class CompatibilityViewModel @Inject constructor(
             }
         }
 
-        val score = overlap * 100f
+        // Shared dislikes calculation
+        val sharedDislikesList = dislikesA.keys.intersect(dislikesB.keys).toList()
+        
+        // Adjust score based on shared dislikes (bonus points for hating the same things)
+        val dislikeBonus = (sharedDislikesList.size * 2f).coerceAtMost(10f)
+        val score = (overlap * 100f + dislikeBonus).coerceAtMost(100f)
+        
         val label = when {
             score >= 85 -> "Kindred Spirits"
             score >= 65 -> "Fellow Admirers"
@@ -114,6 +123,16 @@ class CompatibilityViewModel @Inject constructor(
         if (topB != null && (scoresA[topB] ?: 0) <= 0) {
             diffs.add("${userB.displayName} is a big fan of $topB.")
         }
+        
+        // Add conflict: one likes what the other dislikes
+        for (style in allStyles) {
+            if ((scoresA[style] ?: 0) > (totalA * 0.2f) && (dislikesB[style] ?: 0) > 2) {
+                diffs.add("You're into $style, but ${userB.displayName} isn't a fan.")
+            }
+            if ((scoresB[style] ?: 0) > (totalB * 0.2f) && (dislikesA[style] ?: 0) > 2) {
+                diffs.add("${userB.displayName} loves $style, which you usually dislike.")
+            }
+        }
 
         return ComparisonResult(
             userA = userA,
@@ -121,7 +140,8 @@ class CompatibilityViewModel @Inject constructor(
             score = score,
             label = label,
             sharedStyles = sharedStylesList.sortedByDescending { minOf(it.scoreA, it.scoreB) },
-            differences = diffs,
+            sharedDislikes = sharedDislikesList,
+            differences = diffs.distinct(),
             isLimitedData = userB.totalSwipes < 10
         )
     }

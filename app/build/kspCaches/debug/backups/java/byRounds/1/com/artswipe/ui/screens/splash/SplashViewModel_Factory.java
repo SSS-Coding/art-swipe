@@ -1,5 +1,6 @@
 package com.artswipe.ui.screens.splash;
 
+import com.artswipe.domain.repository.ArtworkRepository;
 import com.artswipe.domain.repository.AuthRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -26,20 +27,26 @@ import javax.inject.Provider;
 public final class SplashViewModel_Factory implements Factory<SplashViewModel> {
   private final Provider<AuthRepository> authRepositoryProvider;
 
-  public SplashViewModel_Factory(Provider<AuthRepository> authRepositoryProvider) {
+  private final Provider<ArtworkRepository> artworkRepositoryProvider;
+
+  public SplashViewModel_Factory(Provider<AuthRepository> authRepositoryProvider,
+      Provider<ArtworkRepository> artworkRepositoryProvider) {
     this.authRepositoryProvider = authRepositoryProvider;
+    this.artworkRepositoryProvider = artworkRepositoryProvider;
   }
 
   @Override
   public SplashViewModel get() {
-    return newInstance(authRepositoryProvider.get());
+    return newInstance(authRepositoryProvider.get(), artworkRepositoryProvider.get());
   }
 
-  public static SplashViewModel_Factory create(Provider<AuthRepository> authRepositoryProvider) {
-    return new SplashViewModel_Factory(authRepositoryProvider);
+  public static SplashViewModel_Factory create(Provider<AuthRepository> authRepositoryProvider,
+      Provider<ArtworkRepository> artworkRepositoryProvider) {
+    return new SplashViewModel_Factory(authRepositoryProvider, artworkRepositoryProvider);
   }
 
-  public static SplashViewModel newInstance(AuthRepository authRepository) {
-    return new SplashViewModel(authRepository);
+  public static SplashViewModel newInstance(AuthRepository authRepository,
+      ArtworkRepository artworkRepository) {
+    return new SplashViewModel(authRepository, artworkRepository);
   }
 }

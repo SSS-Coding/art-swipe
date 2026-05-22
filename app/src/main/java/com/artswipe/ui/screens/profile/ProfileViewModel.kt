@@ -23,8 +23,10 @@ class ProfileViewModel @Inject constructor(
     val currentUser: StateFlow<User?> = authRepository.currentUser
         .onEach { user ->
             user?.let {
-                // Sync likes when user is loaded
-                artworkRepository.syncLikedArtworksFromRemote(it.userId)
+                // Sync likes when user is loaded - Run in separate scope to not block flow emission
+                viewModelScope.launch {
+                    artworkRepository.syncLikedArtworksFromRemote(it.userId)
+                }
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -55,6 +57,11 @@ class ProfileViewModel @Inject constructor(
             )
         }.filter { it.likeCount > 0 }.sortedByDescending { it.likeCount }
 
+        val leastLiked = user.styleDislikes.entries
+            .sortedByDescending { it.value }
+            .take(3)
+            .map { it.key }
+
         val topStyle = breakdown.firstOrNull()?.style ?: "None"
         val (label, description) = StyleEngine.getPersonality(topStyle)
 
@@ -63,6 +70,7 @@ class ProfileViewModel @Inject constructor(
             personalityLabel = label,
             personalityDescription = description,
             styleBreakdown = breakdown,
+            leastLikedStyles = leastLiked,
             showPersonalityCard = user.totalSwipes >= 10
         )
     }

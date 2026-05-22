@@ -46,13 +46,15 @@ public final class ArtworkDao_Impl implements ArtworkDao {
 
   private final SharedSQLiteStatement __preparedStmtOfClearAllSwipeRecords;
 
+  private final SharedSQLiteStatement __preparedStmtOfReshuffleQueue;
+
   public ArtworkDao_Impl(@NonNull final RoomDatabase __db) {
     this.__db = __db;
     this.__insertionAdapterOfArtworkEntity = new EntityInsertionAdapter<ArtworkEntity>(__db) {
       @Override
       @NonNull
       protected String createQuery() {
-        return "INSERT OR REPLACE INTO `artworks` (`id`,`source`,`title`,`artist`,`year`,`imageUrl`,`styleMovement`,`medium`,`description`,`department`,`sourceUrl`) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
+        return "INSERT OR REPLACE INTO `artworks` (`id`,`source`,`title`,`artist`,`year`,`imageUrl`,`styleMovement`,`medium`,`description`,`department`,`sourceUrl`,`randomOrder`) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
       }
 
       @Override
@@ -85,6 +87,7 @@ public final class ArtworkDao_Impl implements ArtworkDao {
         } else {
           statement.bindString(11, entity.getSourceUrl());
         }
+        statement.bindDouble(12, entity.getRandomOrder());
       }
     };
     this.__insertionAdapterOfSwipeRecordEntity = new EntityInsertionAdapter<SwipeRecordEntity>(__db) {
@@ -135,6 +138,14 @@ public final class ArtworkDao_Impl implements ArtworkDao {
       @NonNull
       public String createQuery() {
         final String _query = "DELETE FROM swipe_records";
+        return _query;
+      }
+    };
+    this.__preparedStmtOfReshuffleQueue = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "UPDATE artworks SET randomOrder = ABS(RANDOM()) % 1000000 / 1000000.0";
         return _query;
       }
     };
@@ -276,6 +287,29 @@ public final class ArtworkDao_Impl implements ArtworkDao {
   }
 
   @Override
+  public Object reshuffleQueue(final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfReshuffleQueue.acquire();
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfReshuffleQueue.release(_stmt);
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
   public Flow<List<ArtworkEntity>> getAllArtworks() {
     final String _sql = "SELECT * FROM artworks";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
@@ -296,6 +330,7 @@ public final class ArtworkDao_Impl implements ArtworkDao {
           final int _cursorIndexOfDescription = CursorUtil.getColumnIndexOrThrow(_cursor, "description");
           final int _cursorIndexOfDepartment = CursorUtil.getColumnIndexOrThrow(_cursor, "department");
           final int _cursorIndexOfSourceUrl = CursorUtil.getColumnIndexOrThrow(_cursor, "sourceUrl");
+          final int _cursorIndexOfRandomOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "randomOrder");
           final List<ArtworkEntity> _result = new ArrayList<ArtworkEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final ArtworkEntity _item;
@@ -337,7 +372,9 @@ public final class ArtworkDao_Impl implements ArtworkDao {
             } else {
               _tmpSourceUrl = _cursor.getString(_cursorIndexOfSourceUrl);
             }
-            _item = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl);
+            final float _tmpRandomOrder;
+            _tmpRandomOrder = _cursor.getFloat(_cursorIndexOfRandomOrder);
+            _item = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl,_tmpRandomOrder);
             _result.add(_item);
           }
           return _result;
@@ -378,6 +415,7 @@ public final class ArtworkDao_Impl implements ArtworkDao {
           final int _cursorIndexOfDescription = CursorUtil.getColumnIndexOrThrow(_cursor, "description");
           final int _cursorIndexOfDepartment = CursorUtil.getColumnIndexOrThrow(_cursor, "department");
           final int _cursorIndexOfSourceUrl = CursorUtil.getColumnIndexOrThrow(_cursor, "sourceUrl");
+          final int _cursorIndexOfRandomOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "randomOrder");
           final ArtworkEntity _result;
           if (_cursor.moveToFirst()) {
             final String _tmpId;
@@ -418,7 +456,9 @@ public final class ArtworkDao_Impl implements ArtworkDao {
             } else {
               _tmpSourceUrl = _cursor.getString(_cursorIndexOfSourceUrl);
             }
-            _result = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl);
+            final float _tmpRandomOrder;
+            _tmpRandomOrder = _cursor.getFloat(_cursorIndexOfRandomOrder);
+            _result = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl,_tmpRandomOrder);
           } else {
             _result = null;
           }
@@ -531,7 +571,7 @@ public final class ArtworkDao_Impl implements ArtworkDao {
 
   @Override
   public Flow<List<ArtworkEntity>> getUnswipedArtworks() {
-    final String _sql = "SELECT * FROM artworks WHERE id NOT IN (SELECT artworkId FROM swipe_records)";
+    final String _sql = "SELECT * FROM artworks WHERE id NOT IN (SELECT artworkId FROM swipe_records) ORDER BY randomOrder ASC";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"artworks",
         "swipe_records"}, new Callable<List<ArtworkEntity>>() {
@@ -551,6 +591,7 @@ public final class ArtworkDao_Impl implements ArtworkDao {
           final int _cursorIndexOfDescription = CursorUtil.getColumnIndexOrThrow(_cursor, "description");
           final int _cursorIndexOfDepartment = CursorUtil.getColumnIndexOrThrow(_cursor, "department");
           final int _cursorIndexOfSourceUrl = CursorUtil.getColumnIndexOrThrow(_cursor, "sourceUrl");
+          final int _cursorIndexOfRandomOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "randomOrder");
           final List<ArtworkEntity> _result = new ArrayList<ArtworkEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final ArtworkEntity _item;
@@ -592,7 +633,9 @@ public final class ArtworkDao_Impl implements ArtworkDao {
             } else {
               _tmpSourceUrl = _cursor.getString(_cursorIndexOfSourceUrl);
             }
-            _item = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl);
+            final float _tmpRandomOrder;
+            _tmpRandomOrder = _cursor.getFloat(_cursorIndexOfRandomOrder);
+            _item = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl,_tmpRandomOrder);
             _result.add(_item);
           }
           return _result;
@@ -630,6 +673,7 @@ public final class ArtworkDao_Impl implements ArtworkDao {
           final int _cursorIndexOfDescription = CursorUtil.getColumnIndexOrThrow(_cursor, "description");
           final int _cursorIndexOfDepartment = CursorUtil.getColumnIndexOrThrow(_cursor, "department");
           final int _cursorIndexOfSourceUrl = CursorUtil.getColumnIndexOrThrow(_cursor, "sourceUrl");
+          final int _cursorIndexOfRandomOrder = CursorUtil.getColumnIndexOrThrow(_cursor, "randomOrder");
           final List<ArtworkEntity> _result = new ArrayList<ArtworkEntity>(_cursor.getCount());
           while (_cursor.moveToNext()) {
             final ArtworkEntity _item;
@@ -671,7 +715,9 @@ public final class ArtworkDao_Impl implements ArtworkDao {
             } else {
               _tmpSourceUrl = _cursor.getString(_cursorIndexOfSourceUrl);
             }
-            _item = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl);
+            final float _tmpRandomOrder;
+            _tmpRandomOrder = _cursor.getFloat(_cursorIndexOfRandomOrder);
+            _item = new ArtworkEntity(_tmpId,_tmpSource,_tmpTitle,_tmpArtist,_tmpYear,_tmpImageUrl,_tmpStyleMovement,_tmpMedium,_tmpDescription,_tmpDepartment,_tmpSourceUrl,_tmpRandomOrder);
             _result.add(_item);
           }
           return _result;

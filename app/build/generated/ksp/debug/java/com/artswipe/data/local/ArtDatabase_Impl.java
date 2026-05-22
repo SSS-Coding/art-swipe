@@ -31,13 +31,13 @@ public final class ArtDatabase_Impl extends ArtDatabase {
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2005) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
-        db.execSQL("CREATE TABLE IF NOT EXISTS `artworks` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `year` TEXT, `imageUrl` TEXT NOT NULL, `styleMovement` TEXT NOT NULL, `medium` TEXT, `description` TEXT NOT NULL, `department` TEXT, `sourceUrl` TEXT, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `artworks` (`id` TEXT NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `artist` TEXT NOT NULL, `year` TEXT, `imageUrl` TEXT NOT NULL, `styleMovement` TEXT NOT NULL, `medium` TEXT, `description` TEXT NOT NULL, `department` TEXT, `sourceUrl` TEXT, `randomOrder` REAL NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `swipe_records` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `userId` TEXT NOT NULL, `artworkId` TEXT NOT NULL, `liked` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, `styleMovement` TEXT NOT NULL)");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2b6d5ac641991af53e2ead66719b66b7')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9f06199779d4fa0dee53b4e8f2899fcd')");
       }
 
       @Override
@@ -87,7 +87,7 @@ public final class ArtDatabase_Impl extends ArtDatabase {
       @NonNull
       public RoomOpenHelper.ValidationResult onValidateSchema(
           @NonNull final SupportSQLiteDatabase db) {
-        final HashMap<String, TableInfo.Column> _columnsArtworks = new HashMap<String, TableInfo.Column>(11);
+        final HashMap<String, TableInfo.Column> _columnsArtworks = new HashMap<String, TableInfo.Column>(12);
         _columnsArtworks.put("id", new TableInfo.Column("id", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsArtworks.put("source", new TableInfo.Column("source", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsArtworks.put("title", new TableInfo.Column("title", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
@@ -99,6 +99,7 @@ public final class ArtDatabase_Impl extends ArtDatabase {
         _columnsArtworks.put("description", new TableInfo.Column("description", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsArtworks.put("department", new TableInfo.Column("department", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
         _columnsArtworks.put("sourceUrl", new TableInfo.Column("sourceUrl", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsArtworks.put("randomOrder", new TableInfo.Column("randomOrder", "REAL", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
         final HashSet<TableInfo.ForeignKey> _foreignKeysArtworks = new HashSet<TableInfo.ForeignKey>(0);
         final HashSet<TableInfo.Index> _indicesArtworks = new HashSet<TableInfo.Index>(0);
         final TableInfo _infoArtworks = new TableInfo("artworks", _columnsArtworks, _foreignKeysArtworks, _indicesArtworks);
@@ -126,7 +127,7 @@ public final class ArtDatabase_Impl extends ArtDatabase {
         }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "2b6d5ac641991af53e2ead66719b66b7", "5f139a4e498cccf2130d131f2c3afb74");
+    }, "9f06199779d4fa0dee53b4e8f2899fcd", "02d5c3d4c9b1d6fdef37fb735d3a46e3");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.artswipe.domain.model.User
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -122,7 +123,7 @@ fun CompatibilityScreen(
                 
                 item {
                     Text(
-                        text = "Shared Styles",
+                        text = "Shared Style Interests",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -130,17 +131,32 @@ fun CompatibilityScreen(
                 
                 if (result.sharedStyles.isEmpty()) {
                     item {
-                        Text("No significant overlap yet. You both have unique tastes!")
+                        Text("No significant overlap in likes yet.")
                     }
                 } else {
                     items(result.sharedStyles) { shared ->
                         SharedStyleRow(shared, result.userB.displayName)
                     }
                 }
+
+                if (result.sharedDislikes.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Shared Dislikes",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "You both aren't fans of: ${result.sharedDislikes.joinToString(", ")}",
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
                 
                 item {
                     Text(
-                        text = "Where You Differ",
+                        text = "Vibe Check",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -239,7 +255,7 @@ fun SharedStyleRow(shared: SharedStyle, otherName: String) {
         ) {
             Box(
                 modifier = Modifier
-                    .weight(shared.scoreA)
+                    .weight(shared.scoreA.coerceAtLeast(0.1f))
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(MaterialTheme.colorScheme.primary)
@@ -247,7 +263,7 @@ fun SharedStyleRow(shared: SharedStyle, otherName: String) {
             Spacer(modifier = Modifier.width(4.dp))
             Box(
                 modifier = Modifier
-                    .weight(shared.scoreB)
+                    .weight(shared.scoreB.coerceAtLeast(0.1f))
                     .height(8.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(MaterialTheme.colorScheme.secondary)
@@ -262,6 +278,3 @@ fun SharedStyleRow(shared: SharedStyle, otherName: String) {
         }
     }
 }
-
-// Re-defining User to avoid import issues if needed, but assuming it's available
-private typealias User = com.artswipe.domain.model.User

@@ -34,6 +34,10 @@ class AuthRepositoryImpl @Inject constructor(
             if (firebaseUser == null) {
                 trySend(null)
             } else {
+                // Signal immediately that we have a user (even if profile is still loading)
+                // to prevent navigation redirect loops in the UI
+                trySend(User(userId = firebaseUser.uid, displayName = firebaseUser.displayName ?: "", email = firebaseUser.email ?: "", joinDate = ""))
+
                 snapshotListener = firestore.collection("users").document(firebaseUser.uid)
                     .addSnapshotListener { document, error ->
                         if (error != null) {
@@ -49,10 +53,13 @@ class AuthRepositoryImpl @Inject constructor(
                                 totalSwipes = document.getLong("totalSwipes")?.toInt() ?: 0,
                                 styleScores = (document.get("styleScores") as? Map<String, Long>)
                                     ?.mapValues { it.value.toInt() } ?: emptyMap(),
+                                styleDislikes = (document.get("styleDislikes") as? Map<String, Long>)
+                                    ?.mapValues { it.value.toInt() } ?: emptyMap(),
                                 shareCode = document.getString("shareCode") ?: ""
                             )
                             trySend(user)
                         } else {
+                            // User authenticated but doc doesn't exist yet (e.g. during sign up flow)
                             trySend(User(userId = firebaseUser.uid, displayName = firebaseUser.displayName ?: "", email = firebaseUser.email ?: "", joinDate = ""))
                         }
                     }
@@ -106,6 +113,7 @@ class AuthRepositoryImpl @Inject constructor(
             "joinDate" to joinDate,
             "totalSwipes" to 0,
             "styleScores" to emptyMap<String, Int>(),
+            "styleDislikes" to emptyMap<String, Int>(),
             "shareCode" to shareCode
         )
         
@@ -144,6 +152,8 @@ class AuthRepositoryImpl @Inject constructor(
                     joinDate = doc.getString("joinDate") ?: "",
                     totalSwipes = doc.getLong("totalSwipes")?.toInt() ?: 0,
                     styleScores = (doc.get("styleScores") as? Map<String, Long>)
+                        ?.mapValues { it.value.toInt() } ?: emptyMap(),
+                    styleDislikes = (doc.get("styleDislikes") as? Map<String, Long>)
                         ?.mapValues { it.value.toInt() } ?: emptyMap(),
                     shareCode = doc.getString("shareCode") ?: ""
                 )

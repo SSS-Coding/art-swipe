@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import com.artswipe.data.local.model.ArtworkEntity
 import com.artswipe.data.local.model.SwipeRecordEntity
 
-@Database(entities = [ArtworkEntity::class, SwipeRecordEntity::class], version = 2, exportSchema = false)
+@Database(entities = [ArtworkEntity::class, SwipeRecordEntity::class], version = 2005, exportSchema = false)
 abstract class ArtDatabase : RoomDatabase() {
     abstract fun artworkDao(): ArtworkDao
 }
