@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface ArtworkDao {
-    @Query("SELECT * FROM artworks ORDER BY randomOrder ASC")
+    @Query("SELECT * FROM artworks")
     fun getAllArtworks(): Flow<List<ArtworkEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

@@ -9,6 +9,7 @@ interface MetApi {
     suspend fun search(
         @Query("q") query: String,
         @Query("hasImages") hasImages: Boolean = true,
+        @Query("isHighlight") isHighlight: Boolean? = null,
         @Query("departmentId") departmentId: Int? = null
     ): MetSearchResponse
 
@@ -35,7 +36,9 @@ data class MetObjectResponse(
     val medium: String?,
     val repository: String?,
     val department: String?,
-    val objectURL: String?
+    val objectURL: String?,
+    val isHighlight: Boolean?,
+    val isPublicDomain: Boolean?
 )
 
 data class MetDepartmentsResponse(

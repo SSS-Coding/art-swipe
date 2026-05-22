@@ -17,7 +17,8 @@ import javax.inject.Inject
 
 data class DiscoverUiState(
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val isFetchingMore: Boolean = false
 )
 
 @HiltViewModel
@@ -34,7 +35,7 @@ class DiscoverViewModel @Inject constructor(
 
     init {
         observeArtworkQueue()
-        loadArtworks()
+        loadInitialArtworks()
     }
 
     private fun observeArtworkQueue() {
@@ -42,23 +43,51 @@ class DiscoverViewModel @Inject constructor(
             artworkRepository.getArtworkQueue().collectLatest { remoteArtworks ->
                 val currentList = _artworkQueue.value
                 
-                // Keep the current items that are still in the remote list
+                // Keep the current items that are still in the remote list (haven't been swiped)
                 val stillValid = currentList.filter { current -> remoteArtworks.any { it.id == current.id } }
                 
-                // Find new items that aren't in our current list
-                val newItems = remoteArtworks.filter { remote -> currentList.none { it.id == remote.id } }.shuffled()
+                // Find new items that aren't in our current in-memory queue
+                val newItems = remoteArtworks.filter { remote -> currentList.none { it.id == remote.id } }
                 
-                // Append new items to the end of the current stable list
+                // Stable append: Add new items to the end so the current view doesn't jump
                 _artworkQueue.value = stillValid + newItems
+
+                // If queue is empty and we aren't loading, try to get more
+                if (_artworkQueue.value.isEmpty() && !_uiState.value.isLoading && !_uiState.value.isFetchingMore) {
+                    fetchMore()
+                }
             }
         }
     }
 
-    private fun loadArtworks() {
+    private fun loadInitialArtworks() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
-            artworkRepository.fetchMoreArtworks()
-            _uiState.value = _uiState.value.copy(isLoading = false)
+            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            try {
+                artworkRepository.fetchMoreArtworks()
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(error = "Connection issue. Please try again.")
+            } finally {
+                _uiState.value = _uiState.value.copy(isLoading = false)
+            }
+        }
+    }
+
+    fun retryLoading() {
+        loadInitialArtworks()
+    }
+
+    private fun fetchMore() {
+        if (_uiState.value.isFetchingMore) return
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isFetchingMore = true)
+            try {
+                artworkRepository.fetchMoreArtworks()
+            } catch (e: Exception) {
+                // Background fetch fail is silent but we stop the flag
+            } finally {
+                _uiState.value = _uiState.value.copy(isFetchingMore = false)
+            }
         }
     }
 
@@ -76,9 +105,9 @@ class DiscoverViewModel @Inject constructor(
             
             artworkRepository.saveSwipeRecord(record)
             
-            // Trigger refetch if queue is low
-            if (_artworkQueue.value.size < 10) {
-                artworkRepository.fetchMoreArtworks()
+            // Proactively fetch more if the queue is getting low
+            if (_artworkQueue.value.size < 8) {
+                fetchMore()
             }
         }
     }

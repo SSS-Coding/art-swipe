@@ -311,7 +311,7 @@ public final class ArtworkDao_Impl implements ArtworkDao {
 
   @Override
   public Flow<List<ArtworkEntity>> getAllArtworks() {
-    final String _sql = "SELECT * FROM artworks ORDER BY randomOrder ASC";
+    final String _sql = "SELECT * FROM artworks";
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"artworks"}, new Callable<List<ArtworkEntity>>() {
       @Override
