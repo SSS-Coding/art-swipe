@@ -49,16 +49,16 @@ fun RecommendationsScreen(
         }
     ) { padding ->
         if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else if (artworks.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Text("Swipe more to get personalized recommendations!")
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -76,7 +76,7 @@ fun RecommendationsScreen(
 @Composable
 fun RecommendationCard(artwork: Artwork, onClick: () -> Unit) {
     val context = LocalContext.current
-    
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -110,7 +110,7 @@ fun RecommendationCard(artwork: Artwork, onClick: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    
+
                     artwork.sourceUrl?.let { url ->
                         IconButton(onClick = {
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))

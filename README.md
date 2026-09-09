@@ -34,7 +34,7 @@ app/src/main/java/com/artswipe
 ## Prerequisites
 
 - Android Studio (recent stable version)
-- JDK 11
+- JDK 17 or newer to run Gradle (the app targets Java 11 bytecode)
 - Android SDK (minSdk 26, targetSdk 35)
 - A Firebase project configured for this app
 
@@ -69,3 +69,37 @@ From command line:
 ./gradlew test
 ./gradlew connectedAndroidTest
 ```
+
+## Taste scoring
+
+Compatibility compares the proportion of liked artwork in each known style. The
+sum of the smaller proportion for each style gives a symmetric overlap score from
+0 to 100. Identical distributions score 100, even with different history sizes;
+disjoint distributions score 0. Shared passes are displayed separately and add no
+bonus points. Missing likes produce an unscored state, and either person having
+fewer than 10 swipes triggers an early-data notice.
+
+Existing Firestore data uses `styleScores = 2 * likes - dislikes`. The app recovers
+like counts with `(styleScores + styleDislikes) / 2`, so both profiles and comparisons
+use actual likes without a migration. Style names are normalized for whitespace
+and case; blank, unknown and unclassified styles do not affect taste calculations.
+Previously misclassified museum records are not automatically rewritten.
+
+## Verification
+
+```powershell
+.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
+.\gradlew.bat :app:connectedDebugAndroidTest
+```
+
+Unit tests cover scoring bounds, symmetry, negative scores, missing data, count
+overflow, style normalization, and share codes/links. Emulator tests cover profile
+loading, comparison UI, dark mode, account-isolated Room queries, duplicate legacy
+records, collection ordering, and stable cached metadata. The comparison UI tests
+use fake profiles and do not write to Firebase.
+
+Firestore swipe writes use atomic batches and retain offline queuing. This does
+not implement cross-device conflict resolution or a durable Room-to-Firestore
+outbox: permanent remote write failures are logged. Firebase authentication,
+security rules and real two-account sharing still need validation against the
+configured Firebase project before release.

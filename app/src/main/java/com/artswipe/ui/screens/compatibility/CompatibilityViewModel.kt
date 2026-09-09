@@ -4,13 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.artswipe.domain.model.User
 import com.artswipe.domain.repository.AuthRepository
-import com.artswipe.domain.util.StyleEngine
+import com.artswipe.domain.util.ShareCode
+import com.artswipe.domain.util.TasteComparison
+import com.artswipe.domain.util.TasteEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 data class CompatibilityUiState(
@@ -19,130 +24,55 @@ data class CompatibilityUiState(
     val comparisonResult: ComparisonResult? = null
 )
 
-data class ComparisonResult(
-    val userA: User,
-    val userB: User,
-    val score: Float,
-    val label: String,
-    val sharedStyles: List<SharedStyle>,
-    val sharedDislikes: List<String>,
-    val differences: List<String>,
-    val isLimitedData: Boolean
-)
-
-data class SharedStyle(
-    val style: String,
-    val scoreA: Float,
-    val scoreB: Float
-)
+data class ComparisonResult(val userA: User, val userB: User, val taste: TasteComparison)
 
 @HiltViewModel
 class CompatibilityViewModel @Inject constructor(
     private val authRepository: AuthRepository
 ) : ViewModel() {
-
     private val _uiState = MutableStateFlow(CompatibilityUiState())
-    val uiState: StateFlow<CompatibilityUiState> = _uiState.asStateFlow()
+    val uiState = _uiState.asStateFlow()
+    private var comparisonJob: Job? = null
 
-    fun compareWithCode(code: String) {
-        viewModelScope.launch {
-            _uiState.value = CompatibilityUiState(isLoading = true)
-            
-            val currentUser = authRepository.currentUser.first()
-            if (currentUser == null) {
-                _uiState.value = CompatibilityUiState(error = "You must be logged in.")
-                return@launch
-            }
-
-            if (currentUser.shareCode == code.uppercase()) {
-                _uiState.value = CompatibilityUiState(error = "You cannot compare with yourself!")
-                return@launch
-            }
-
-            val result = authRepository.findUserByShareCode(code)
-            if (result.isSuccess) {
-                val otherUser = result.getOrNull()
-                if (otherUser != null) {
-                    val comparison = computeCompatibility(currentUser, otherUser)
-                    _uiState.value = CompatibilityUiState(comparisonResult = comparison)
-                } else {
-                    _uiState.value = CompatibilityUiState(error = "User code not found.")
-                }
-            } else {
-                _uiState.value = CompatibilityUiState(error = result.exceptionOrNull()?.message ?: "Unknown error")
-            }
-        }
+    fun reset() {
+        comparisonJob?.cancel()
+        _uiState.value = CompatibilityUiState()
     }
 
-    private fun computeCompatibility(userA: User, userB: User): ComparisonResult {
-        val scoresA = userA.styleScores
-        val scoresB = userB.styleScores
-        val dislikesA = userA.styleDislikes
-        val dislikesB = userB.styleDislikes
-        
-        val allStyles = (scoresA.keys + scoresB.keys).distinct()
-        val totalA = scoresA.values.sum().toFloat().coerceAtLeast(1f)
-        val totalB = scoresB.values.sum().toFloat().coerceAtLeast(1f)
-
-        var overlap = 0f
-        val sharedStylesList = mutableListOf<SharedStyle>()
-        
-        for (style in allStyles) {
-            val pctA = (scoresA[style] ?: 0) / totalA
-            val pctB = (scoresB[style] ?: 0) / totalB
-            val minOverlap = minOf(pctA, pctB)
-            overlap += minOverlap
-            
-            if (minOverlap > 0.05f) { // Significant shared interest
-                sharedStylesList.add(SharedStyle(style, pctA * 100f, pctB * 100f))
+    fun compareWithCode(input: String) {
+        comparisonJob?.cancel()
+        val code = ShareCode.parse(input)
+        if (code == null) {
+            _uiState.value = CompatibilityUiState(error = "Enter an ART share code or paste an ArtSwipe comparison link.")
+            return
+        }
+        comparisonJob = viewModelScope.launch {
+            _uiState.value = CompatibilityUiState(isLoading = true)
+            try {
+                withTimeout(15_000) {
+                    val currentUser = authRepository.currentUser.first { it == null || it.isProfileLoaded }
+                    if (currentUser == null) {
+                        _uiState.value = CompatibilityUiState(error = "Sign in to compare your taste, then open this code again.")
+                        return@withTimeout
+                    }
+                    if (currentUser.shareCode.equals(code, ignoreCase = true)) {
+                        _uiState.value = CompatibilityUiState(error = "That's your code! Try a friend's code to compare.")
+                        return@withTimeout
+                    }
+                    val other = authRepository.findUserByShareCode(code).getOrThrow()
+                    _uiState.value = when {
+                        other == null -> CompatibilityUiState(error = "We couldn't find that code. Check it and try again.")
+                        other.userId == currentUser.userId -> CompatibilityUiState(error = "That's your profile. Try a friend's code.")
+                        else -> CompatibilityUiState(comparisonResult = ComparisonResult(currentUser, other, TasteEngine.compare(currentUser, other)))
+                    }
+                }
+            } catch (e: TimeoutCancellationException) {
+                _uiState.value = CompatibilityUiState(error = "Your profile took too long to load. Check your connection and try again.")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.value = CompatibilityUiState(error = "Couldn't load the comparison. Check your connection and try again.")
             }
         }
-
-        // Shared dislikes calculation
-        val sharedDislikesList = dislikesA.keys.intersect(dislikesB.keys).toList()
-        
-        // Adjust score based on shared dislikes (bonus points for hating the same things)
-        val dislikeBonus = (sharedDislikesList.size * 2f).coerceAtMost(10f)
-        val score = (overlap * 100f + dislikeBonus).coerceAtMost(100f)
-        
-        val label = when {
-            score >= 85 -> "Kindred Spirits"
-            score >= 65 -> "Fellow Admirers"
-            score >= 45 -> "Curious Contrast"
-            score >= 25 -> "Worlds Apart"
-            else -> "Total Opposites"
-        }
-
-        val diffs = mutableListOf<String>()
-        val topA = scoresA.entries.maxByOrNull { it.value }?.key
-        val topB = scoresB.entries.maxByOrNull { it.value }?.key
-        
-        if (topA != null && (scoresB[topA] ?: 0) <= 0) {
-            diffs.add("You love $topA, but ${userB.displayName} hasn't discovered it yet.")
-        }
-        if (topB != null && (scoresA[topB] ?: 0) <= 0) {
-            diffs.add("${userB.displayName} is a big fan of $topB.")
-        }
-        
-        // Add conflict: one likes what the other dislikes
-        for (style in allStyles) {
-            if ((scoresA[style] ?: 0) > (totalA * 0.2f) && (dislikesB[style] ?: 0) > 2) {
-                diffs.add("You're into $style, but ${userB.displayName} isn't a fan.")
-            }
-            if ((scoresB[style] ?: 0) > (totalB * 0.2f) && (dislikesA[style] ?: 0) > 2) {
-                diffs.add("${userB.displayName} loves $style, which you usually dislike.")
-            }
-        }
-
-        return ComparisonResult(
-            userA = userA,
-            userB = userB,
-            score = score,
-            label = label,
-            sharedStyles = sharedStylesList.sortedByDescending { minOf(it.scoreA, it.scoreB) },
-            sharedDislikes = sharedDislikesList,
-            differences = diffs.distinct(),
-            isLimitedData = userB.totalSwipes < 10
-        )
     }
 }

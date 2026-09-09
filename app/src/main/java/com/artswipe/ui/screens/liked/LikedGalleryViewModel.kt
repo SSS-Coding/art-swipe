@@ -26,23 +26,24 @@ class LikedGalleryViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _selectedStyle = MutableStateFlow<String?>(null)
-    
+
     val uiState: StateFlow<LikedGalleryUiState> = combine(
         artworkRepository.getLikedArtworks(),
         _selectedStyle
     ) { likedArtworks, selectedStyle ->
         val styles = likedArtworks.map { it.styleMovement }.distinct().sorted()
-        val filtered = if (selectedStyle == null) {
+        val activeStyle = selectedStyle?.takeIf { it in styles }
+        val filtered = if (activeStyle == null) {
             likedArtworks
         } else {
-            likedArtworks.filter { it.styleMovement == selectedStyle }
+            likedArtworks.filter { it.styleMovement == activeStyle }
         }
-        
+
         LikedGalleryUiState(
             artworks = likedArtworks,
             filteredArtworks = filtered,
             styles = styles,
-            selectedStyle = selectedStyle,
+            selectedStyle = activeStyle,
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), LikedGalleryUiState(isLoading = true))
@@ -54,19 +55,6 @@ class LikedGalleryViewModel @Inject constructor(
     fun unlikeArtwork(artwork: Artwork) {
         viewModelScope.launch {
             val user = authRepository.currentUser.first() ?: return@launch
-            // To unlike, we basically create a "disliked" record or remove the liked one.
-            // The requirement says: "Option to unlike from this screen (updates Firestore + recalculates style scores)"
-            // We'll implement a 'deleteSwipeRecord' or similar in repository.
-            val record = SwipeRecord(
-                userId = user.userId,
-                artworkId = artwork.id,
-                liked = false, // Changing to disliked effectively unlikes it and updates scores
-                timestamp = System.currentTimeMillis(),
-                styleMovement = artwork.styleMovement
-            )
-            // But actually, just deleting the record might be cleaner if we want it to reappear in Discover.
-            // However, the "style-engine" logic adds +2 for like and -1 for dislike.
-            // If we "unlike", we should probably reverse the +2.
             artworkRepository.removeSwipeRecord(user.userId, artwork.id, artwork.styleMovement)
         }
     }

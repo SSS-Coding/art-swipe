@@ -6,7 +6,8 @@ data class StyleProfile(
     val personalityDescription: String,
     val styleBreakdown: List<StylePercentage>,
     val leastLikedStyles: List<String>,
-    val showPersonalityCard: Boolean
+    val showPersonalityCard: Boolean,
+    val totalSwipes: Int = 0
 )
 
 data class StylePercentage(

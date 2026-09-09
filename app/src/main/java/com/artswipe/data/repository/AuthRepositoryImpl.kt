@@ -7,6 +7,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.FirebaseAuth.AuthStateListener
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -26,24 +27,24 @@ class AuthRepositoryImpl @Inject constructor(
 
     override val currentUser: Flow<User?> = callbackFlow {
         var snapshotListener: ListenerRegistration? = null
-        
+
         val authListener = FirebaseAuth.AuthStateListener { auth ->
             val firebaseUser = auth.currentUser
             snapshotListener?.remove()
-            
+
             if (firebaseUser == null) {
                 trySend(null)
             } else {
                 // Signal immediately that we have a user (even if profile is still loading)
                 // to prevent navigation redirect loops in the UI
-                trySend(User(userId = firebaseUser.uid, displayName = firebaseUser.displayName ?: "", email = firebaseUser.email ?: "", joinDate = ""))
+                trySend(User(userId = firebaseUser.uid, displayName = firebaseUser.displayName ?: "", email = firebaseUser.email ?: "", joinDate = "", isProfileLoaded = false))
 
                 snapshotListener = firestore.collection("users").document(firebaseUser.uid)
                     .addSnapshotListener { document, error ->
                         if (error != null) {
                             return@addSnapshotListener
                         }
-                        
+
                         if (document != null && document.exists()) {
                             val user = User(
                                 userId = firebaseUser.uid,
@@ -60,14 +61,14 @@ class AuthRepositoryImpl @Inject constructor(
                             trySend(user)
                         } else {
                             // User authenticated but doc doesn't exist yet (e.g. during sign up flow)
-                            trySend(User(userId = firebaseUser.uid, displayName = firebaseUser.displayName ?: "", email = firebaseUser.email ?: "", joinDate = ""))
+                            trySend(User(userId = firebaseUser.uid, displayName = firebaseUser.displayName ?: "", email = firebaseUser.email ?: "", joinDate = "", isProfileLoaded = false))
                         }
                     }
             }
         }
 
         firebaseAuth.addAuthStateListener(authListener)
-        awaitClose { 
+        awaitClose {
             firebaseAuth.removeAuthStateListener(authListener)
             snapshotListener?.remove()
         }
@@ -75,8 +76,11 @@ class AuthRepositoryImpl @Inject constructor(
 
     override suspend fun signInWithEmail(email: String, pass: String): Result<Unit> {
         return try {
-            firebaseAuth.signInWithEmailAndPassword(email, pass).await()
+            val signedIn = firebaseAuth.signInWithEmailAndPassword(email, pass).await().user
+            signedIn?.let { ensureUserProfile(it.uid, it.displayName.orEmpty()) }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -88,6 +92,8 @@ class AuthRepositoryImpl @Inject constructor(
             val firebaseUser = result.user ?: throw Exception("User creation failed")
             createInitialUserDocAsync(firebaseUser.uid, displayName)
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -96,17 +102,20 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun signInWithGoogle(idToken: String): Result<Unit> {
         return try {
             val credential = GoogleAuthProvider.getCredential(idToken, null)
-            firebaseAuth.signInWithCredential(credential).await()
+            val signedIn = firebaseAuth.signInWithCredential(credential).await().user
+            signedIn?.let { ensureUserProfile(it.uid, it.displayName.orEmpty()) }
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
 
     private suspend fun createInitialUserDocAsync(uid: String, displayName: String) {
-        val shareCode = "ART-${UUID.randomUUID().toString().take(4).uppercase()}"
+        val shareCode = "ART-${UUID.randomUUID().toString().replace("-", "").take(12).uppercase(Locale.ROOT)}"
         val joinDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-        
+
         val userDoc = mapOf(
             "userId" to uid,
             "displayName" to displayName,
@@ -116,8 +125,26 @@ class AuthRepositoryImpl @Inject constructor(
             "styleDislikes" to emptyMap<String, Int>(),
             "shareCode" to shareCode
         )
-        
+
         firestore.collection("users").document(uid).set(userDoc).await()
+    }
+
+    private suspend fun ensureUserProfile(uid: String, displayName: String) {
+        val ref = firestore.collection("users").document(uid)
+        val newCode = "ART-${UUID.randomUUID().toString().replace("-", "").take(12).uppercase(Locale.ROOT)}"
+        firestore.runTransaction { transaction ->
+            val doc = transaction.get(ref)
+            if (!doc.exists()) {
+                transaction.set(ref, mapOf(
+                    "userId" to uid, "displayName" to displayName,
+                    "joinDate" to SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date()),
+                    "totalSwipes" to 0, "styleScores" to emptyMap<String, Int>(),
+                    "styleDislikes" to emptyMap<String, Int>(), "shareCode" to newCode
+                ))
+            } else if (doc.getString("shareCode").isNullOrBlank()) {
+                transaction.update(ref, "shareCode", newCode)
+            }
+        }.await()
     }
 
     override suspend fun signOut() {
@@ -128,6 +155,8 @@ class AuthRepositoryImpl @Inject constructor(
         return try {
             firebaseAuth.sendPasswordResetEmail(email).await()
             Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -136,19 +165,19 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun findUserByShareCode(code: String): Result<User?> {
         return try {
             val query = firestore.collection("users")
-                .whereEqualTo("shareCode", code.uppercase())
+                .whereEqualTo("shareCode", code.trim().uppercase(Locale.ROOT))
                 .limit(1)
                 .get()
                 .await()
-            
+
             if (query.isEmpty) {
                 Result.success(null)
             } else {
                 val doc = query.documents.first()
                 val user = User(
-                    userId = doc.getString("userId") ?: "",
+                    userId = doc.id,
                     displayName = doc.getString("displayName") ?: "",
-                    email = "", 
+                    email = "",
                     joinDate = doc.getString("joinDate") ?: "",
                     totalSwipes = doc.getLong("totalSwipes")?.toInt() ?: 0,
                     styleScores = (doc.get("styleScores") as? Map<String, Long>)
@@ -159,6 +188,8 @@ class AuthRepositoryImpl @Inject constructor(
                 )
                 Result.success(user)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Result.failure(e)
         }

@@ -1,6 +1,10 @@
 package com.artswipe.ui.screens.discover
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -13,64 +17,56 @@ import com.artswipe.ui.screens.discover.components.SwipeableCard
 @Composable
 fun DiscoverScreen(
     modifier: Modifier = Modifier,
+    onNavigateToExplanation: (String) -> Unit = {},
     viewModel: DiscoverViewModel = hiltViewModel()
 ) {
-    val artworkQueue by viewModel.artworkQueue.collectAsState()
-    val uiState by viewModel.uiState.collectAsState()
-
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        if (uiState.isLoading && artworkQueue.isEmpty()) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator()
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Fetching masterpieces...")
-            }
-        } else if (artworkQueue.isEmpty()) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier.padding(32.dp)
-            ) {
-                Text(
-                    text = uiState.error ?: "No more art for now. Our curators are finding more!",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Button(onClick = { viewModel.retryLoading() }) {
-                    Text("Retry Discovery")
+    val queue by viewModel.artworkQueue.collectAsState()
+    val state by viewModel.uiState.collectAsState()
+    Column(modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Find what moves you.", style = MaterialTheme.typography.headlineLarge)
+        Text("A daily wander through the world's collections", style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (state.isFetchingMore) LinearProgressIndicator(Modifier.fillMaxWidth())
+        Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+            if (queue.isEmpty()) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (state.isLoading || state.isFetchingMore) {
+                        CircularProgressIndicator()
+                        Text("Opening the gallery…")
+                    } else {
+                        Text(state.error ?: "You've explored this collection. Ready for more?", textAlign = TextAlign.Center)
+                        Button(onClick = viewModel::retryLoading) { Text("Load more art") }
+                    }
+                }
+            } else {
+                queue.take(2).reversed().forEach { artwork ->
+                    key(artwork.id) {
+                        SwipeableCard(artwork, { viewModel.onSwipe(artwork, false) },
+                            { viewModel.onSwipe(artwork, true) }, enabled = artwork.id == queue.first().id && !state.isSaving)
+                    }
                 }
             }
-        } else {
-            // Quick Swipes
-            artworkQueue.take(2).reversed().forEach { artwork ->
-                key(artwork.id) {
-                    SwipeableCard(
-                        artwork = artwork,
-                        onSwipeLeft = {
-                            viewModel.onSwipe(artwork, false)
-                        },
-                        onSwipeRight = {
-                            viewModel.onSwipe(artwork, true)
-                        }
-                    )
+        }
+        if (queue.isNotEmpty()) {
+            state.error?.let {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(it, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    TextButton(onClick = viewModel::retryLoading) { Text("Retry") }
                 }
             }
-            
-            // Show a small loader at the bottom if background fetching
-            if (uiState.isFetchingMore) {
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .padding(top = 8.dp)
-                )
+            val current = queue.first()
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(onClick = { viewModel.onSwipe(current, false) }, enabled = !state.isSaving) {
+                    Icon(Icons.Default.Close, null); Spacer(Modifier.width(6.dp)); Text("Pass")
+                }
+                IconButton(onClick = { onNavigateToExplanation(current.id) }) { Icon(Icons.Default.Info, "Artwork details") }
+                Button(onClick = { viewModel.onSwipe(current, true) }, enabled = !state.isSaving) {
+                    Icon(Icons.Default.Favorite, null); Spacer(Modifier.width(6.dp)); Text("Like")
+                }
             }
+            Text("Swipe left to pass · right to save", Modifier.align(Alignment.CenterHorizontally),
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

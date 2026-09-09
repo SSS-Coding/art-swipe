@@ -1,27 +1,39 @@
 package com.artswipe.ui.screens.compatibility
 
 import android.content.Intent
-import androidx.compose.foundation.background
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.CompareArrows
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.artswipe.domain.model.User
+import com.artswipe.domain.util.SharedStyle
+import com.artswipe.domain.util.ShareCode
+import com.artswipe.domain.util.StyleEngine
+import com.artswipe.domain.util.TasteEngine
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,159 +42,116 @@ fun CompatibilityScreen(
     onBack: () -> Unit,
     viewModel: CompatibilityViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    var codeInput by remember { mutableStateOf(initialCode) }
+    val state by viewModel.uiState.collectAsState()
+    var input by rememberSaveable(initialCode) { mutableStateOf(initialCode) }
     val context = LocalContext.current
-
+    val keyboard = LocalSoftwareKeyboardController.current
+    val compare = { keyboard?.hide(); viewModel.compareWithCode(input) }
     LaunchedEffect(initialCode) {
-        if (initialCode.isNotEmpty()) {
-            viewModel.compareWithCode(initialCode)
-        }
+        if (initialCode.isNotBlank()) viewModel.compareWithCode(initialCode)
     }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Taste Compatibility") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { padding ->
-        if (uiState.comparisonResult == null) {
-            // Code Entry State
+    Scaffold(topBar = {
+        TopAppBar(title = { Text("Compare tastes") }, navigationIcon = {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+        })
+    }) { padding ->
+        val result = state.comparisonResult
+        if (result == null) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                Modifier.fillMaxSize().padding(padding).imePadding()
+                    .verticalScroll(rememberScrollState()).padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                Text(
-                    text = "Compare with a Friend",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Enter their unique share code to see how your art tastes align.",
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Spacer(modifier = Modifier.height(32.dp))
-                
+                Spacer(Modifier.height(16.dp))
+                Icon(Icons.AutoMirrored.Filled.CompareArrows, null,
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(48.dp))
+                Text("Art brings us together.", style = MaterialTheme.typography.displaySmall)
+                Text("Discover where your tastes meet, and what you could show each other next.",
+                    style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 OutlinedTextField(
-                    value = codeInput,
-                    onValueChange = { codeInput = it.uppercase() },
-                    label = { Text("Friend's Code (e.g. ART-XXXX)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
+                    value = input, onValueChange = { input = it },
+                    modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text("Friend's code or comparison link") },
+                    placeholder = { Text("ART-XXXX") }, enabled = !state.isLoading,
+                    isError = state.error != null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { if (!state.isLoading) compare() })
                 )
-                
-                if (uiState.error != null) {
-                    Text(
-                        text = uiState.error!!,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                Button(onClick = compare, enabled = ShareCode.parse(input) != null && !state.isLoading,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                    if (state.isLoading) {
+                        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Text("Finding your common ground…")
+                    } else Text("Compare our tastes")
                 }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Button(
-                    onClick = { viewModel.compareWithCode(codeInput) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = codeInput.length >= 8 && !uiState.isLoading
-                ) {
-                    if (uiState.isLoading) {
-                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = Color.White)
-                    } else {
-                        Text("Compare")
+                OutlinedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("A little more discovery goes a long way", fontWeight = FontWeight.SemiBold)
+                        Text("Try at least 10 swipes each. Your comparison reflects the styles in your liked art and evolves as you explore.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
         } else {
-            // Result State
-            val result = uiState.comparisonResult!!
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(bottom = 32.dp)
-            ) {
-                item {
-                    MatchCard(result)
-                }
-                
-                item {
-                    Text(
-                        text = "Shared Style Interests",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                if (result.sharedStyles.isEmpty()) {
+            val taste = result.taste
+            LazyColumn(Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                item { MatchCard(result) }
+                if (taste.isLimitedData || taste.score == null) {
                     item {
-                        Text("No significant overlap in likes yet.")
-                    }
-                } else {
-                    items(result.sharedStyles) { shared ->
-                        SharedStyleRow(shared, result.userB.displayName)
-                    }
-                }
-
-                if (result.sharedDislikes.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = "Shared Dislikes",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "You both aren't fans of: ${result.sharedDislikes.joinToString(", ")}",
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-                
-                item {
-                    Text(
-                        text = "Vibe Check",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-                
-                items(result.differences) { diff ->
-                    Text(text = "• $diff", style = MaterialTheme.typography.bodyLarge)
-                }
-                
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = { 
-                            val sendIntent: Intent = Intent().apply {
-                                action = Intent.ACTION_SEND
-                                putExtra(Intent.EXTRA_TEXT, "My art taste is ${result.score.toInt()}% compatible with ${result.userB.displayName} on ArtSwipe! Check your compatibility with my code: ${result.userA.shareCode}")
-                                type = "text/plain"
+                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(if (taste.score == null) "Your comparison is still taking shape" else "An early impression", fontWeight = FontWeight.Bold)
+                                Text(if (taste.score == null) "Both people need liked artwork with known styles before we can calculate a meaningful percentage."
+                                    else "One or both of you have fewer than 10 swipes. This score may change as you discover more art.")
                             }
-                            val shareIntent = Intent.createChooser(sendIntent, null)
-                            context.startActivity(shareIntent)
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Share Results")
+                        }
+                    }
+                }
+                item {
+                    Text("Common ground", style = MaterialTheme.typography.headlineSmall)
+                    Text("Share of each person's liked art", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (taste.sharedStyles.isEmpty()) {
+                    item { Text("No shared liked styles yet. There's more to discover together.") }
+                }
+                items(taste.sharedStyles, key = { it.style }) { SharedStyleRow(it, result.userB.displayName.ifBlank { "Friend" }) }
+                if (taste.differences.isNotEmpty()) {
+                    item { Text("A different point of view", style = MaterialTheme.typography.headlineSmall) }
+                    items(taste.differences) { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                }
+                if (taste.sharedDislikes.isNotEmpty()) {
+                    item {
+                        OutlinedCard {
+                            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("Styles you've both passed on", fontWeight = FontWeight.Bold)
+                                Text(taste.sharedDislikes.joinToString(" · "))
+                                Text("Shared passes are context and don't add points to your match.", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+                item {
+                    Text("How the score works", fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(8.dp))
+                    Text("We compare the proportion of likes in each known style and add the overlap. 100% means identical style proportions; 0% means no shared liked styles. Unclassified art is left out. This describes your art preferences, not your relationship.",
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                item {
+                    if (taste.score != null) {
+                        Button(onClick = {
+                            val message = "${taste.score}% shared art taste with ${result.userB.displayName} on ArtSwipe! Compare with me: artswipe://compare?code=${result.userA.shareCode}"
+                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"; putExtra(Intent.EXTRA_TEXT, message)
+                            }, "Share your comparison"))
+                        }, enabled = result.userA.shareCode.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Default.Share, null); Spacer(Modifier.width(8.dp)); Text("Share comparison")
+                        }
+                    }
+                    OutlinedButton(onClick = { input = ""; viewModel.reset() }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Compare with someone else")
                     }
                 }
             }
@@ -192,89 +161,54 @@ fun CompatibilityScreen(
 
 @Composable
 fun MatchCard(result: ComparisonResult) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer),
-        shape = RoundedCornerShape(24.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "${result.score.toInt()}%",
-                style = MaterialTheme.typography.displayLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onTertiaryContainer
-            )
-            Text(
-                text = result.label,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onTertiaryContainer
-            )
-            
-            Spacer(modifier = Modifier.height(24.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                UserMiniCard("You", result.userA)
-                Text("×", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                UserMiniCard(result.userB.displayName, result.userB)
+    val taste = result.taste
+    val progress by animateFloatAsState((taste.score ?: 0) / 100f, tween(900), label = "Taste overlap")
+    Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+        Column(Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("YOUR SHARED ART TASTE", style = MaterialTheme.typography.labelLarge)
+            Box(Modifier.size(168.dp), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxSize(),
+                    strokeWidth = 8.dp, trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f))
+                Text(taste.score?.let { "$it%" } ?: "—", style = MaterialTheme.typography.displayLarge)
+            }
+            Text(taste.label, style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                UserMiniCard("You", result.userA, Modifier.weight(1f))
+                UserMiniCard(result.userB.displayName.ifBlank { "Friend" }, result.userB, Modifier.weight(1f))
             }
         }
     }
 }
 
 @Composable
-fun UserMiniCard(label: String, user: User) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, style = MaterialTheme.typography.labelMedium)
-        // Personality mapping (hardcoded for simplicity in UI)
-        val personality = when (user.styleScores.maxByOrNull { it.value }?.key?.lowercase()) {
-            "impressionism" -> "Dreamer"
-            "baroque" -> "Dramatist"
-            "modernism" -> "Visionary"
-            else -> "Explorer"
-        }
-        Text(text = personality, fontWeight = FontWeight.Bold)
+fun UserMiniCard(label: String, user: User, modifier: Modifier = Modifier) {
+    val topStyle = TasteEngine.likeCounts(user).entries.sortedBy { it.key }.maxByOrNull { it.value }?.key.orEmpty()
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)
+        Text(StyleEngine.getPersonality(topStyle).first, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text("${user.totalSwipes.coerceAtLeast(0)} swipes", style = MaterialTheme.typography.bodySmall)
     }
 }
 
 @Composable
 fun SharedStyleRow(shared: SharedStyle, otherName: String) {
-    Column {
-        Text(text = shared.style, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(4.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .weight(shared.scoreA.coerceAtLeast(0.1f))
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Box(
-                modifier = Modifier
-                    .weight(shared.scoreB.coerceAtLeast(0.1f))
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.colorScheme.secondary)
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(shared.style, style = MaterialTheme.typography.titleMedium)
+        TasteBar("You", shared.scoreA, MaterialTheme.colorScheme.primary)
+        TasteBar(otherName, shared.scoreB, MaterialTheme.colorScheme.tertiary)
+    }
+}
+
+@Composable
+private fun TasteBar(name: String, percentage: Float, color: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(name, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text("${percentage.roundToInt()}%", style = MaterialTheme.typography.labelMedium)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(text = "You: ${shared.scoreA.toInt()}%", fontSize = 10.sp)
-            Text(text = "$otherName: ${shared.scoreB.toInt()}%", fontSize = 10.sp)
-        }
+        LinearProgressIndicator(progress = { (percentage / 100f).coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth().height(8.dp), color = color)
     }
 }

@@ -16,21 +16,38 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = GalleryGreenLight,
+    background = androidx.compose.ui.graphics.Color(0xFF151B17),
+    surface = androidx.compose.ui.graphics.Color(0xFF151B17),
+    primaryContainer = androidx.compose.ui.graphics.Color(0xFF244C3D),
+    onPrimaryContainer = androidx.compose.ui.graphics.Color(0xFFCDEBD7),
+    secondary = androidx.compose.ui.graphics.Color(0xFFC3CAB7),
+    secondaryContainer = androidx.compose.ui.graphics.Color(0xFF364638),
+    onSecondaryContainer = androidx.compose.ui.graphics.Color(0xFFDCE8D7),
+    surfaceVariant = androidx.compose.ui.graphics.Color(0xFF3F4942),
+    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFFBFC9C0),
+    tertiary = ClayLight
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
+    primary = GalleryGreen,
+    background = Paper,
+    surface = Paper,
+    onSurface = Ink,
+    primaryContainer = androidx.compose.ui.graphics.Color(0xFFDCEADF),
+    onPrimaryContainer = androidx.compose.ui.graphics.Color(0xFF173D2F),
+    secondary = androidx.compose.ui.graphics.Color(0xFF58634C),
+    secondaryContainer = androidx.compose.ui.graphics.Color(0xFFE3E8D8),
+    onSecondaryContainer = androidx.compose.ui.graphics.Color(0xFF283625),
+    surfaceVariant = androidx.compose.ui.graphics.Color(0xFFE6E8DF),
+    onSurfaceVariant = androidx.compose.ui.graphics.Color(0xFF50594F),
+    tertiary = Clay
 )
 
 @Composable
 fun ArtSwipeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
@@ -45,8 +62,8 @@ fun ArtSwipeTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = darkTheme
+            window.statusBarColor = colorScheme.background.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 

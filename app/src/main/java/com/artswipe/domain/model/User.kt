@@ -8,5 +8,6 @@ data class User(
     val totalSwipes: Int = 0,
     val styleScores: Map<String, Int> = emptyMap(),
     val styleDislikes: Map<String, Int> = emptyMap(),
-    val shareCode: String = ""
+    val shareCode: String = "",
+    val isProfileLoaded: Boolean = true
 )

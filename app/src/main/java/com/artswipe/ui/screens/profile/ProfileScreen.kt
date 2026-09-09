@@ -1,6 +1,10 @@
 package com.artswipe.ui.screens.profile
 
 import android.content.Intent
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +44,7 @@ fun ProfileScreen(
     val user by viewModel.currentUser.collectAsState()
     val styleProfile by viewModel.styleProfile.collectAsState()
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
 
     Scaffold(
         modifier = modifier,
@@ -85,7 +90,7 @@ fun ProfileScreen(
                         ) {
                             Icon(Icons.Default.Recommend, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Recs")
+                            Text("For you")
                         }
                         Button(
                             onClick = onNavigateToCompatibility,
@@ -109,7 +114,7 @@ fun ProfileScreen(
                     item {
                         Column {
                             Text(
-                                text = "Styles You're Not Into",
+                                text = "Styles you've passed on",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.error
@@ -146,7 +151,7 @@ fun ProfileScreen(
                         StyleRow(index, styleItem)
                     }
                 }
-                
+
                 if (styleProfile == null || styleProfile?.styleBreakdown?.isEmpty() == true) {
                     item {
                         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -167,14 +172,19 @@ fun ProfileScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column {
+                            Column(Modifier.weight(1f)) {
                                 Text(text = "Your Share Code", style = MaterialTheme.typography.labelMedium)
-                                Text(text = user?.shareCode ?: "", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                SelectionContainer {
+                                    Text(text = user?.shareCode.orEmpty().ifBlank { "Loading…" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                }
                             }
-                            IconButton(onClick = {
+                            IconButton(enabled = !user?.shareCode.isNullOrBlank(), onClick = {
+                                clipboard.setText(AnnotatedString(user?.shareCode.orEmpty()))
+                            }) { Icon(Icons.Default.ContentCopy, "Copy code") }
+                            IconButton(enabled = !user?.shareCode.isNullOrBlank(), onClick = {
                                 val sendIntent: Intent = Intent().apply {
                                     action = Intent.ACTION_SEND
-                                    putExtra(Intent.EXTRA_TEXT, "Check out my art taste on ArtSwipe! My code is: ${user?.shareCode}. Download the app to compare!")
+                                    putExtra(Intent.EXTRA_TEXT, "Compare our art tastes on ArtSwipe: artswipe://compare?code=${user?.shareCode}")
                                     type = "text/plain"
                                 }
                                 val shareIntent = Intent.createChooser(sendIntent, null)
@@ -223,15 +233,18 @@ fun PersonalityCard(profile: StyleProfile) {
                 )
             } else {
                 Text(
-                    text = "Analyzing Your Taste...",
+                    text = "Your eye for art is emerging",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Swipe on more art to unlock your personality card.",
+                    text = if (profile.totalSwipes < 10) "${profile.totalSwipes.coerceAtLeast(0)} of 10 swipes. Like the art that speaks to you to reveal your taste profile."
+                        else "Like a few artworks with known styles to reveal your taste profile.",
                     style = MaterialTheme.typography.bodyMedium
                 )
+                Spacer(Modifier.height(16.dp))
+                LinearProgressIndicator(progress = { (profile.totalSwipes / 10f).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -240,9 +253,10 @@ fun PersonalityCard(profile: StyleProfile) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun StyleBreakdownSection(breakdown: List<StylePercentage>) {
+    if (breakdown.isEmpty()) return
     Column {
         Text(
-            text = "Style Breakdown",
+            text = "What you love",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold
         )
@@ -260,19 +274,19 @@ fun StyleBreakdownSection(breakdown: List<StylePercentage>) {
                 MaterialTheme.colorScheme.error,
                 MaterialTheme.colorScheme.outline
             )
-            
+
             breakdown.forEachIndexed { index, item ->
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .weight(item.percentage.coerceAtLeast(1f))
+                        .weight(item.percentage.coerceAtLeast(0.001f))
                         .background(colors[index % colors.size])
                 )
             }
         }
-        
+
         Spacer(modifier = Modifier.height(12.dp))
-        
+
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

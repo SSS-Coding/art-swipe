@@ -11,7 +11,13 @@ import com.artswipe.domain.repository.ArtworkRepository
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import com.artswipe.domain.repository.AuthRepository
+import com.artswipe.domain.util.TasteEngine
+import com.google.firebase.firestore.FieldPath
+import android.util.Log
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
@@ -21,17 +27,26 @@ class ArtworkRepositoryImpl @Inject constructor(
     private val metApi: MetApi,
     private val aicApi: AicApi,
     private val artworkDao: ArtworkDao,
-    private val firestore: FirebaseFirestore
+    private val firestore: FirebaseFirestore,
+    private val authRepository: AuthRepository
 ) : ArtworkRepository {
 
+    private val swipeMutex = Mutex()
+    private val fetchMutex = Mutex()
+
+    private fun userQueue(): Flow<List<ArtworkEntity>> = authRepository.currentUser
+        .map { it?.userId }.distinctUntilChanged().flatMapLatest { userId ->
+            if (userId == null) flowOf(emptyList()) else artworkDao.getUnswipedArtworks(userId)
+        }
+
     private val styles = listOf(
-        "Impressionism", "Baroque", "Modernism", "Surrealism", "Realism", 
-        "Abstract", "Renaissance", "Landscape", "Portrait", "Mythology", 
+        "Impressionism", "Baroque", "Modernism", "Surrealism", "Realism",
+        "Abstract", "Renaissance", "Landscape", "Portrait", "Mythology",
         "Still Life", "Romanticism", "Contemporary", "Pop Art", "Expressionism"
     )
 
     override fun getArtworkQueue(): Flow<List<Artwork>> {
-        return artworkDao.getUnswipedArtworks().map { entities ->
+        return userQueue().map { entities ->
             // Filter archival records retroactively in case they exist in DB
             entities.filterNot { isArchival(it.title, it.artist, it.department, it.medium, it.imageUrl) }
                 .map { it.toDomain() }
@@ -50,7 +65,7 @@ class ArtworkRepositoryImpl @Inject constructor(
 
         // 1. Blacklist generic AIC Archive placeholder image ID
         if (u.contains("342b2214-04d5-de63-b577-55a08a618960")) return true
-        
+
         // 2. Blacklist explicitly non-art titles and administrative records
         val blockKeywords = listOf(
             "archive", "collection record", "finding aid", "reference record",
@@ -59,35 +74,35 @@ class ArtworkRepositoryImpl @Inject constructor(
             "negative", "microfilm", "memo", "pamphlet", "finding-aid", "scrapbook",
             "notebook", "portfolio", "letter to", "memo", "inventory"
         )
-        
+
         if (blockKeywords.any { t.contains(it) || d.contains(it) || m.contains(it) || a.contains(it) }) return true
-        
+
         // Skip items with titles that are just numbers or extremely short
         if (t.isBlank() || t.length < 3 || t.all { it.isDigit() || it == '-' || it == '_' || it == ' ' }) return true
 
         return false
     }
 
-    override suspend fun fetchMoreArtworks() = coroutineScope {
+    override suspend fun fetchMoreArtworks() = fetchMutex.withLock { coroutineScope {
         var totalAdded = 0
         var attempts = 0
-        
+
         // Persistent loop: Keep trying different styles until we have at least 15 valid artworks
         while (totalAdded < 15 && attempts < 8) {
             attempts++
             val style = styles.random()
-            
+
             // Try Met Museum
             try {
                 // Search without department restriction to get a wider pool
                 val metSearch = metApi.search(query = style, hasImages = true)
                 val ids = metSearch.objectIDs?.shuffled()?.take(30) ?: emptyList()
-                
+
                 val metFetches = ids.map { id ->
                     async {
                         try {
                             val obj = metApi.getObject(id)
-                            if (obj.primaryImage?.startsWith("http") == true && 
+                            if (obj.primaryImage?.startsWith("http") == true &&
                                 !isArchival(obj.title, obj.artistDisplayName, obj.department, obj.medium, obj.primaryImage)) {
                                 ArtworkEntity(
                                     id = "met_${obj.objectID}",
@@ -98,21 +113,20 @@ class ArtworkRepositoryImpl @Inject constructor(
                                     imageUrl = obj.primaryImage!!,
                                     styleMovement = style,
                                     medium = obj.medium,
-                                    description = "A magnificent piece from the Met Museum.",
+                                    description = "From The Metropolitan Museum of Art collection.",
                                     department = obj.department,
                                     sourceUrl = obj.objectURL,
                                     randomOrder = Random.nextFloat()
                                 )
                             } else null
-                        } catch (e: Exception) { null }
+                        } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
                     }
                 }
                 val valid = metFetches.awaitAll().filterNotNull()
                 if (valid.isNotEmpty()) {
-                    artworkDao.insertArtworks(valid)
-                    totalAdded += valid.size
+                    totalAdded += artworkDao.insertArtworks(valid).count { it != -1L }
                 }
-            } catch (e: Exception) { /* continue */ }
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { /* Try the other museum. */ }
 
             // Try AIC
             try {
@@ -131,9 +145,9 @@ class ArtworkRepositoryImpl @Inject constructor(
                             artist = aicArt.artist_display ?: "Unknown Artist",
                             year = aicArt.date_display,
                             imageUrl = "$iiifBaseUrl/$imageId/full/843,/0/default.jpg",
-                            styleMovement = aicArt.style_title ?: style,
+                            styleMovement = aicArt.style_title?.takeIf { it.isNotBlank() } ?: "Unclassified",
                             medium = aicArt.medium_display,
-                            description = "A magnificent work from the Art Institute of Chicago.",
+                            description = aicArt.description?.let { android.text.Html.fromHtml(it, android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim() }.orEmpty(),
                             department = aicArt.department_title,
                             sourceUrl = aicArt.websiteUrl,
                             randomOrder = Random.nextFloat()
@@ -141,11 +155,10 @@ class ArtworkRepositoryImpl @Inject constructor(
                     } else null
                 }
                 if (aicEntities.isNotEmpty()) {
-                    artworkDao.insertArtworks(aicEntities)
-                    totalAdded += aicEntities.size
+                    totalAdded += artworkDao.insertArtworks(aicEntities).count { it != -1L }
                 }
-            } catch (e: Exception) { /* continue */ }
-            
+            } catch (e: CancellationException) { throw e } catch (e: Exception) { /* Try the other museum. */ }
+
             if (totalAdded < 15) {
                 // Short delay to avoid rate limiting during high-frequency retries
                 delay(500)
@@ -157,12 +170,16 @@ class ArtworkRepositoryImpl @Inject constructor(
         }
     }
 
+    }
+
     override suspend fun getArtworkById(id: String): Artwork? {
         return artworkDao.getArtworkById(id)?.toDomain()
     }
 
-    override suspend fun saveSwipeRecord(record: SwipeRecord) {
-        artworkDao.insertSwipeRecord(
+    override suspend fun saveSwipeRecord(record: SwipeRecord) = swipeMutex.withLock {
+        val previous = artworkDao.getLatestSwipeForArtwork(record.userId, record.artworkId)
+        if (previous?.liked == record.liked && previous.styleMovement == record.styleMovement) return@withLock
+        artworkDao.replaceSwipeRecord(
             SwipeRecordEntity(
                 userId = record.userId,
                 artworkId = record.artworkId,
@@ -179,94 +196,88 @@ class ArtworkRepositoryImpl @Inject constructor(
             "timestamp" to record.timestamp,
             "styleMovement" to record.styleMovement
         )
-        
+
         artwork?.let {
             swipeData["title"] = it.title
             swipeData["artist"] = it.artist
             swipeData["imageUrl"] = it.imageUrl
+            swipeData["description"] = it.description
             swipeData["source"] = it.source
             swipeData["year"] = it.year ?: ""
             swipeData["medium"] = it.medium ?: ""
             swipeData["department"] = it.department ?: ""
             swipeData["sourceUrl"] = it.sourceUrl ?: ""
         }
-        
-        firestore.collection("users").document(record.userId)
-            .collection("swipes").document(record.artworkId).set(swipeData)
 
-        if (record.liked) {
-            firestore.collection("users").document(record.userId).update(
-                "totalSwipes", FieldValue.increment(1),
-                "styleScores.${record.styleMovement}", FieldValue.increment(2)
-            )
-        } else {
-            firestore.collection("users").document(record.userId).update(
-                "totalSwipes", FieldValue.increment(1),
-                "styleScores.${record.styleMovement}", FieldValue.increment(-1),
-                "styleDislikes.${record.styleMovement}", FieldValue.increment(1)
-            )
+        val userRef = firestore.collection("users").document(record.userId)
+        val batch = firestore.batch()
+        batch.set(userRef.collection("swipes").document(record.artworkId), swipeData)
+        batch.update(userRef, "totalSwipes", FieldValue.increment(if (previous == null) 1L else 0L))
+        val scoreDeltas = mutableMapOf<String, Long>()
+        val dislikeDeltas = mutableMapOf<String, Long>()
+        if (previous != null) {
+            scoreDeltas[previous.styleMovement] = if (previous.liked) -2L else 1L
+            if (!previous.liked) dislikeDeltas[previous.styleMovement] = -1L
         }
+        scoreDeltas[record.styleMovement] = (scoreDeltas[record.styleMovement] ?: 0L) + if (record.liked) 2L else -1L
+        if (!record.liked) dislikeDeltas[record.styleMovement] = (dislikeDeltas[record.styleMovement] ?: 0L) + 1L
+        scoreDeltas.forEach { (style, delta) -> batch.update(userRef, FieldPath.of("styleScores", style), FieldValue.increment(delta)) }
+        dislikeDeltas.forEach { (style, delta) -> batch.update(userRef, FieldPath.of("styleDislikes", style), FieldValue.increment(delta)) }
+        // Firestore queues this atomic batch offline. Keep discovery responsive.
+        batch.commit().addOnFailureListener { Log.e("ArtSwipe", "Could not sync swipe", it) }
+        Unit
     }
 
-    override suspend fun removeSwipeRecord(userId: String, artworkId: String, styleMovement: String) {
-        val lastSwipe = artworkDao.getLatestSwipeForArtwork(artworkId)
-        val wasLiked = lastSwipe?.liked ?: return
-
-        artworkDao.deleteSwipeRecordForArtwork(artworkId)
-        firestore.collection("users").document(userId).collection("swipes").document(artworkId).delete()
-
-        if (wasLiked) {
-            firestore.collection("users").document(userId).update(
-                "totalSwipes", FieldValue.increment(-1),
-                "styleScores.$styleMovement", FieldValue.increment(-2)
-            )
-        } else {
-            firestore.collection("users").document(userId).update(
-                "totalSwipes", FieldValue.increment(-1),
-                "styleScores.$styleMovement", FieldValue.increment(1),
-                "styleDislikes.$styleMovement", FieldValue.increment(-1)
-            )
-        }
+    override suspend fun removeSwipeRecord(userId: String, artworkId: String, styleMovement: String) = swipeMutex.withLock {
+        val lastSwipe = artworkDao.getLatestSwipeForArtwork(userId, artworkId) ?: return@withLock
+        artworkDao.deleteSwipeRecordForArtwork(userId, artworkId)
+        val userRef = firestore.collection("users").document(userId)
+        val batch = firestore.batch()
+        batch.delete(userRef.collection("swipes").document(artworkId))
+        batch.update(userRef, "totalSwipes", FieldValue.increment(-1))
+        batch.update(userRef, FieldPath.of("styleScores", lastSwipe.styleMovement), FieldValue.increment(if (lastSwipe.liked) -2L else 1L))
+        if (!lastSwipe.liked) batch.update(userRef, FieldPath.of("styleDislikes", lastSwipe.styleMovement), FieldValue.increment(-1))
+        batch.commit().addOnFailureListener { Log.e("ArtSwipe", "Could not sync removed swipe", it) }
+        Unit
     }
-
     override fun getLikedArtworks(): Flow<List<Artwork>> {
-        return artworkDao.getLikedArtworks().map { entities -> 
+        return authRepository.currentUser.map { it?.userId }.distinctUntilChanged().flatMapLatest { userId ->
+            if (userId == null) flowOf(emptyList()) else artworkDao.getLikedArtworks(userId)
+        }.map { entities ->
             entities.filterNot { isArchival(it.title, it.artist, it.department, it.medium, it.imageUrl) }
-                .map { it.toDomain() } 
+                .map { it.toDomain() }
         }
     }
 
     override fun getRecommendations(topStyles: List<String>): Flow<List<Artwork>> {
-        return artworkDao.getUnswipedArtworks().map { entities ->
+        return userQueue().map { entities ->
             entities.filterNot { isArchival(it.title, it.artist, it.department, it.medium, it.imageUrl) }
-                .filter { it.styleMovement in topStyles }.map { it.toDomain() }
+                .filter { TasteEngine.normalizeStyle(it.styleMovement) in topStyles }.map { it.toDomain() }
         }
     }
 
-    override suspend fun resetPreferences(userId: String) {
-        artworkDao.clearAllSwipeRecords()
-        artworkDao.clearAll() 
-        
+    override suspend fun resetPreferences(userId: String): Unit = swipeMutex.withLock {
+        val swipesRef = firestore.collection("users").document(userId).collection("swipes")
+        val swipes = swipesRef.get().await()
+        for (chunk in swipes.documents.chunked(400)) {
+            val batch = firestore.batch()
+            chunk.forEach { batch.delete(it.reference) }
+            batch.commit().await()
+        }
         firestore.collection("users").document(userId).update(
             "totalSwipes", 0,
             "styleScores", emptyMap<String, Int>(),
             "styleDislikes", emptyMap<String, Int>()
         ).await()
-        
-        val swipesRef = firestore.collection("users").document(userId).collection("swipes")
-        val swipes = swipesRef.get().await()
-        for (doc in swipes.documents) doc.reference.delete()
-        
-        fetchMoreArtworks()
+        artworkDao.clearAllSwipeRecords(userId)
     }
 
-    override suspend fun syncLikedArtworksFromRemote(userId: String) {
+    override suspend fun syncLikedArtworksFromRemote(userId: String): Unit = swipeMutex.withLock {
         try {
             val swipes = firestore.collection("users").document(userId)
                 .collection("swipes").get().await()
-            
+
             val entitiesToRestore = mutableListOf<ArtworkEntity>()
-            val recordsToInsert = mutableListOf<SwipeRecordEntity>()
 
             for (doc in swipes.documents) {
                 val artworkId = doc.getString("artworkId") ?: continue
@@ -277,7 +288,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 val artist = doc.getString("artist") ?: "Unknown Artist"
                 val dept = doc.getString("department") ?: ""
                 val medium = doc.getString("medium") ?: ""
-                
+
                 if (liked && imageUrl.startsWith("http") && !isArchival(title, artist, dept, medium, imageUrl)) {
                     entitiesToRestore.add(ArtworkEntity(
                         id = artworkId,
@@ -295,7 +306,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                     ))
                 }
 
-                artworkDao.insertSwipeRecord(
+                artworkDao.replaceSwipeRecord(
                     SwipeRecordEntity(
                         userId = userId, artworkId = artworkId,
                         liked = liked, timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
@@ -304,8 +315,7 @@ class ArtworkRepositoryImpl @Inject constructor(
                 )
             }
             if (entitiesToRestore.isNotEmpty()) artworkDao.insertArtworks(entitiesToRestore)
-            recordsToInsert.forEach { artworkDao.insertSwipeRecord(it) }
-        } catch (e: Exception) { e.printStackTrace() }
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { Log.e("ArtSwipe", "Could not sync collection", e) }
     }
 
     override suspend fun reshuffleQueue() {

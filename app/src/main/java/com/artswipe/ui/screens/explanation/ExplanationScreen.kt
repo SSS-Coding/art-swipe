@@ -70,9 +70,9 @@ fun ExplanationScreen(
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Fit
                         )
-                        
-                        // Like/Dislike indicator
-                        Surface(
+
+                        // Show a reaction only after the user has made a choice.
+                        if (uiState.isLiked != null) Surface(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(16.dp),
@@ -84,14 +84,14 @@ fun ExplanationScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = if (uiState.isLiked) Icons.Default.Favorite else Icons.Default.Close,
+                                    imageVector = if (uiState.isLiked == true) Icons.Default.Favorite else Icons.Default.Close,
                                     contentDescription = null,
-                                    tint = if (uiState.isLiked) Color.Green else Color.Red,
+                                    tint = if (uiState.isLiked == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (uiState.isLiked) "Liked" else "Disliked",
+                                    text = if (uiState.isLiked == true) "Liked" else "Passed",
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 14.sp
                                 )
@@ -124,7 +124,7 @@ fun ExplanationScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = artwork.description,
+                            text = artwork.description.ifBlank { "Explore this artwork in its museum collection for more context." },
                             style = MaterialTheme.typography.bodyLarge
                         )
 
@@ -148,7 +148,7 @@ fun ExplanationScreen(
                                 )
                             }
                         }
-                        
+
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                 }

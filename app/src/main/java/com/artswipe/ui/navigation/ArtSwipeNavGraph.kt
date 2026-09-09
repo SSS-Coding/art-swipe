@@ -2,6 +2,7 @@ package com.artswipe.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
+import androidx.navigation.navArgument
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -97,6 +98,7 @@ fun ArtSwipeNavGraph(
 
         composable(
             route = Screen.Comparison.route,
+            arguments = listOf(navArgument("code") { defaultValue = "" }),
             deepLinks = listOf(navDeepLink { uriPattern = "artswipe://compare?code={code}" })
         ) { backStackEntry ->
             val code = backStackEntry.arguments?.getString("code") ?: ""

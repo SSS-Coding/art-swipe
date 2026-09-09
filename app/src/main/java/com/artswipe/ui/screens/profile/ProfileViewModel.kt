@@ -9,6 +9,7 @@ import com.artswipe.domain.model.User
 import com.artswipe.domain.repository.ArtworkRepository
 import com.artswipe.domain.repository.AuthRepository
 import com.artswipe.domain.util.StyleEngine
+import com.artswipe.domain.util.TasteEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -20,10 +21,20 @@ class ProfileViewModel @Inject constructor(
     private val artworkRepository: ArtworkRepository
 ) : ViewModel() {
 
+    private var syncedUserId: String? = null
+    private val _resetState = MutableStateFlow<String?>(null)
+    val resetState = _resetState.asStateFlow()
+    private val _isResetting = MutableStateFlow(false)
+    val isResetting = _isResetting.asStateFlow()
+    private val _authStateResolved = MutableStateFlow(false)
+    val authStateResolved = _authStateResolved.asStateFlow()
+
     val currentUser: StateFlow<User?> = authRepository.currentUser
         .onEach { user ->
-            user?.let {
-                // Sync likes when user is loaded - Run in separate scope to not block flow emission
+            _authStateResolved.value = true
+            if (user == null) syncedUserId = null
+            user?.takeIf { it.isProfileLoaded && it.userId != syncedUserId }?.let {
+                syncedUserId = it.userId
                 viewModelScope.launch {
                     artworkRepository.syncLikedArtworksFromRemote(it.userId)
                 }
@@ -31,33 +42,29 @@ class ProfileViewModel @Inject constructor(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val authStateResolved: StateFlow<Boolean> = authRepository.currentUser
-        .map { true }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
     val styleProfile: StateFlow<StyleProfile?> = combine(
         authRepository.currentUser,
         artworkRepository.getLikedArtworks()
     ) { user, likedArtworks ->
-        user?.let { calculateStyleProfile(it, likedArtworks) }
+        user?.takeIf { it.isProfileLoaded }?.let { calculateStyleProfile(it, likedArtworks) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private fun calculateStyleProfile(user: User, likedArtworks: List<Artwork>): StyleProfile {
-        val scores = user.styleScores
-        val totalLikes = scores.values.filter { it > 0 }.sum().toFloat()
-        
+        val scores = TasteEngine.likeCounts(user)
+        val distribution = TasteEngine.distribution(user)
+
         val breakdown = scores.map { (style, score) ->
             // Find a thumbnail from liked artworks of this style
-            val thumbnail = likedArtworks.firstOrNull { it.styleMovement == style }?.imageUrl
+            val thumbnail = likedArtworks.firstOrNull { TasteEngine.normalizeStyle(it.styleMovement) == style }?.imageUrl
             StylePercentage(
                 style = style,
-                percentage = if (totalLikes > 0 && score > 0) (score / totalLikes) * 100f else 0f,
+                percentage = distribution[style] ?: 0f,
                 likeCount = score,
                 thumbnailUrl = thumbnail
             )
         }.filter { it.likeCount > 0 }.sortedByDescending { it.likeCount }
 
-        val leastLiked = user.styleDislikes.entries
+        val leastLiked = user.styleDislikes.entries.filter { it.value > 0 }
             .sortedByDescending { it.value }
             .take(3)
             .map { it.key }
@@ -71,7 +78,8 @@ class ProfileViewModel @Inject constructor(
             personalityDescription = description,
             styleBreakdown = breakdown,
             leastLikedStyles = leastLiked,
-            showPersonalityCard = user.totalSwipes >= 10
+            showPersonalityCard = user.totalSwipes >= 10 && breakdown.isNotEmpty(),
+            totalSwipes = user.totalSwipes
         )
     }
 
@@ -83,8 +91,20 @@ class ProfileViewModel @Inject constructor(
 
     fun resetPreferences() {
         val userId = currentUser.value?.userId ?: return
+        if (_isResetting.value) return
+        _isResetting.value = true
+        _resetState.value = null
         viewModelScope.launch {
-            artworkRepository.resetPreferences(userId)
+            try {
+                artworkRepository.resetPreferences(userId)
+                _resetState.value = "Your preferences have been reset."
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _resetState.value = "Couldn't finish resetting. Check your connection and try again."
+            } finally {
+                _isResetting.value = false
+            }
         }
     }
 }

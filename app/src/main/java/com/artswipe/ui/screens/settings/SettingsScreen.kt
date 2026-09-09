@@ -20,6 +20,8 @@ fun SettingsScreen(
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
     val user by viewModel.currentUser.collectAsState()
+    val isResetting by viewModel.isResetting.collectAsState()
+    val resetMessage by viewModel.resetState.collectAsState()
     var showResetDialog by remember { mutableStateOf(false) }
 
     if (showResetDialog) {
@@ -68,15 +70,15 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.primary
             )
-            
+
             Spacer(modifier = Modifier.height(16.dp))
-            
+
             ListItem(
                 headlineContent = { Text(user?.displayName ?: "User") },
                 supportingContent = { Text(user?.email ?: "") },
                 leadingContent = { Icon(Icons.Default.Person, contentDescription = null) }
             )
-            
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
             ListItem(
@@ -84,14 +86,16 @@ fun SettingsScreen(
                 supportingContent = { Text("Clear all swipes and style scores") },
                 leadingContent = { Icon(Icons.Default.Refresh, contentDescription = null) },
                 trailingContent = {
-                    TextButton(onClick = { showResetDialog = true }) {
-                        Text("Reset")
+                    TextButton(enabled = !isResetting, onClick = { showResetDialog = true }) {
+                        Text(if (isResetting) "Resetting…" else "Reset")
                     }
                 }
             )
 
+            resetMessage?.let { Text(it, modifier = Modifier.padding(16.dp)) }
+
             Spacer(modifier = Modifier.weight(1f) )
-            
+
             TextButton(
                 onClick = {
                     viewModel.signOut()

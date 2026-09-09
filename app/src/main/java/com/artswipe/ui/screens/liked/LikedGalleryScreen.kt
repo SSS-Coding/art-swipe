@@ -39,7 +39,7 @@ fun LikedGalleryScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("Liked Gallery") },
+                title = { Column { Text("Your collection"); Text("${uiState.artworks.size} saved artworks", style = MaterialTheme.typography.bodySmall) } },
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
@@ -81,13 +81,13 @@ fun LikedGalleryScreen(
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Adaptive(150.dp),
                     contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(uiState.filteredArtworks) { artwork ->
+                    items(uiState.filteredArtworks, key = { it.id }) { artwork ->
                         LikedArtworkCard(
                             artwork = artwork,
                             onClick = { onNavigateToExplanation(artwork.id) },
@@ -120,7 +120,7 @@ fun LikedArtworkCard(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Crop
             )
-            
+
             // Info Overlay
             Box(
                 modifier = Modifier
@@ -137,13 +137,14 @@ fun LikedArtworkCard(
                     maxLines = 1
                 )
             }
-            
+
             // Unlike Button
             IconButton(
                 onClick = onUnlike,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(4.dp)
+                    .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(24.dp))
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,

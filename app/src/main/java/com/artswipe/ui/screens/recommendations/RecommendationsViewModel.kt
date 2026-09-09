@@ -21,13 +21,13 @@ class RecommendationsViewModel @Inject constructor(
     val recommendedArtworks: StateFlow<List<Artwork>> = authRepository.currentUser
         .flatMapLatest { user ->
             if (user == null) return@flatMapLatest flowOf(emptyList())
-            
-            val topStyles = user.styleScores.entries
+
+            val topStyles = com.artswipe.domain.util.TasteEngine.likeCounts(user).entries
                 .filter { it.value > 0 }
                 .sortedByDescending { it.value }
                 .take(3)
                 .map { it.key }
-            
+
             artworkRepository.getRecommendations(topStyles)
         }
         .onEach { _isLoading.value = false }

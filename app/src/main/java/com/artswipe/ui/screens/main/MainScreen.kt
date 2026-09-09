@@ -23,10 +23,10 @@ fun MainScreen(
     onNavigateToSettings: () -> Unit,
     viewModel: ProfileViewModel = hiltViewModel()
 ) {
-    var selectedItem by remember { mutableIntStateOf(0) }
+    var selectedItem by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
     val items = listOf("Discover", "Profile", "Liked")
     val icons = listOf(Icons.Default.Swipe, Icons.Default.Person, Icons.Default.Favorite)
-    
+
     val user by viewModel.currentUser.collectAsState()
     val authStateResolved by viewModel.authStateResolved.collectAsState()
 
@@ -53,6 +53,7 @@ fun MainScreen(
         val modifier = Modifier.padding(padding)
         when (selectedItem) {
             0 -> DiscoverScreen(
+                onNavigateToExplanation = onNavigateToExplanation,
                 modifier = modifier
             )
             1 -> ProfileScreen(

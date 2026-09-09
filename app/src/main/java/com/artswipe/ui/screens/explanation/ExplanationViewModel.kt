@@ -6,6 +6,8 @@ import com.artswipe.data.local.ArtworkDao
 import com.artswipe.domain.model.Artwork
 import com.artswipe.domain.repository.ArtworkRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.first
+import com.artswipe.domain.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +16,7 @@ import javax.inject.Inject
 
 data class ExplanationUiState(
     val artwork: Artwork? = null,
-    val isLiked: Boolean = false,
+    val isLiked: Boolean? = null,
     val styleDescription: String = "",
     val isLoading: Boolean = true
 )
@@ -22,7 +24,8 @@ data class ExplanationUiState(
 @HiltViewModel
 class ExplanationViewModel @Inject constructor(
     private val artworkRepository: ArtworkRepository,
-    private val artworkDao: ArtworkDao // Using DAO directly to check the swipe record easily for this mock/demo
+    private val artworkDao: ArtworkDao,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExplanationUiState())
@@ -32,11 +35,12 @@ class ExplanationViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
             val artwork = artworkRepository.getArtworkById(artworkId)
-            val swipeRecord = artworkDao.getLatestSwipeForArtwork(artworkId)
-            
+            val user = authRepository.currentUser.first()
+            val swipeRecord = user?.let { artworkDao.getLatestSwipeForArtwork(it.userId, artworkId) }
+
             _uiState.value = _uiState.value.copy(
                 artwork = artwork,
-                isLiked = swipeRecord?.liked ?: false,
+                isLiked = swipeRecord?.liked,
                 styleDescription = getStyleDescription(artwork?.styleMovement ?: ""),
                 isLoading = false
             )
